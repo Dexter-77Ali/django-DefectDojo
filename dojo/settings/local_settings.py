@@ -25,3 +25,9 @@ _context_processors[_context_processors.index("dojo.context_processors.globalize
 
 # --- company values (DD_* environment variables; defaults are placeholders) ---
 COMPANY_NAME = env("DD_COMPANY_NAME", default="Company")  # noqa: F821
+
+# --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
+# Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here
+# would otherwise silently fall back to upstream behaviour.
+FINDING_SLA_PERIOD_METHOD = "dojo.company.sla.finding_sla_period"
+FINDING_SLA_EXPIRATION_CALCULATION_METHOD = "dojo.company.sla.update_sla_expiration_dates"
