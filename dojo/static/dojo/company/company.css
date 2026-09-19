@@ -1,0 +1,21 @@
+/*
+ * company: brand overrides, loaded after dojo.css by the company base.html.
+ *
+ * Tailwind v4 emits utilities as var(--color-dd-primary-N) and defines the
+ * tokens inside @layer theme; unlayered rules here win the cascade, so
+ * redefining the tokens recolours the sidebar, buttons and links without a
+ * Tailwind rebuild. Values below are PLACEHOLDERS (a teal ramp) until the
+ * company palette is supplied; keep the 50..900 ramp shape.
+ */
+:root {
+  --color-dd-primary-50:  #e6f4f3;
+  --color-dd-primary-100: #c2e4e1;
+  --color-dd-primary-200: #8ccbc6;
+  --color-dd-primary-300: #5fb3ac;
+  --color-dd-primary-400: #3d9c94;
+  --color-dd-primary-500: #23857d;
+  --color-dd-primary-600: #1c6e68;
+  --color-dd-primary-700: #165753;
+  --color-dd-primary-800: #10413e;
+  --color-dd-primary-900: #0a2b29;
+}

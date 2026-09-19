@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+{% load display_tags %}
+{# company: extends upstream dojo/templates/base.html through recursive template loading and #}
+{# overrides four blocks only. Everything else renders from the upstream file. #}
+
+{% block header_logo %}
+    <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0">
+        <img src="{% static 'dojo/company/icon.png' %}" alt="{{ COMPANY_NAME }}" class="w-8 h-8 flex-shrink-0">
+        <span class="text-lg font-semibold text-white truncate">{{ COMPANY_NAME }}</span>
+    </a>
+{% endblock %}
+
+{% block support-tab %}{% endblock %}
+
+{% block dojo_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'dojo/company/company.css' %}?v={% static_v 'dojo/company/company.css' %}">
+{% endblock %}
+
+{% block footer %}
+    <footer class="border-t border-gray-200 bg-white py-8 mt-8">
+        <div class="text-center text-sm text-gray-500">
+            <p>
+                <a href="{% url 'home' %}">
+                    <img src="{% static 'dojo/company/logo.png' %}" alt="{{ COMPANY_NAME }}" style="height:45px;width:auto;display:inline-block"/>
+                </a>
+            </p>
+            <p class="mt-2">{{ COMPANY_NAME }} vulnerability management, {% dojo_version %}</p>
+            <p>
+                {% trans "Built on DefectDojo, licensed under the" %} <a href="https://github.com/DefectDojo/django-DefectDojo/blob/master/LICENSE.md" class="text-blue-600 hover:underline">3-Clause BSD License</a>
+                | <a href="https://github.com/DefectDojo/django-DefectDojo/blob/master/NOTICE" class="text-blue-600 hover:underline">{% trans "Dependencies Notice" %}</a>
+            </p>
+            <p>&copy; 2015-{% now "Y" %} DefectDojo, Inc. All rights reserved. DefectDojo is trademark of DefectDojo, Inc.</p>
+        </div>
+    </footer>
+{% endblock %}
