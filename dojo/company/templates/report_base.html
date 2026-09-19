@@ -1,0 +1,270 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_name }}</title>
+    <!-- Same compiled stylesheet the app shell uses, so reports pick up the
+         component styles (panels, grid, tables) from one place rather than a
+         vendored Bootstrap build. -->
+    <link rel="stylesheet" href="{% static "dojo/css/tailwind-out.css" %}">
+    {# company: report branding, loaded after the upstream stylesheets #}
+    <link rel="stylesheet" href="{% static 'dojo/company/company.css' %}">
+    <!-- Custom Fonts -->
+    <!-- Font Awesome 6, same as the app shell. The report templates use v6
+         class names (fa-solid), which the v4 build previously linked here does
+         not define -- that is the "icons don't work in the report template"
+         the report templates carry comments about. -->
+    <link href="{% static 'fontawesomefree/css/fontawesome.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'fontawesomefree/css/solid.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'fontawesomefree/css/brands.min.css' %}" rel="stylesheet" type="text/css">
+
+    <style type="text/css">
+        @import url(https://fonts.googleapis.com/css?family=Roboto+Slab:400,700);
+
+        .label {
+          border-color: #DEE1E6;
+          color: #ffffff !important;
+        }
+
+        .container {
+            margin: 0 auto;
+            max-width: 960px;
+        }
+
+        .page-cover {
+            margin-bottom: 600px !important;
+        }
+
+        .page-cover-spacer {
+            height: 400px !important;
+        }
+
+        .panel-default {
+            border-color: #A1C0D7 !important;
+        }
+
+        .panel-default > .panel-heading {
+            color: #333 !important;
+            background-color: rgba(32, 166, 216, 0.75)!important;
+            border-color: rgba(32, 166, 216, 0.75) !important;
+            border-radius: 0px !important;
+        }
+
+        .panel-info {
+            border-color: #DEE1E6 !important;
+            border-radius: 0px !important;
+        }
+
+        .panel-info > .panel-heading {
+            color: #333 !important;
+            background-color: #DEE1E6 !important;
+            border-color: #DEE1E6 !important;
+            border-radius: 0px !important;
+        }
+
+        .panel-body {
+            border-radius: 0px !important;
+        }
+
+        .severity {
+            font-size: 100%;
+        }
+
+        .severity- {
+            color: black !important;
+        }
+
+        .severity-Info {
+            background-color: #888888 !important;
+        }
+
+        .severity-Low {
+            background-color: #337ab7 !important;
+        }
+
+        .severity-Medium {
+            background-color: #FBE413 !important;
+        }
+
+        .severity-High {
+            background-color: #f09835 !important;
+        }
+
+        .severity-Critical {
+            background-color: #d9534f !important;
+        }
+
+        .panel-heading {
+            padding: 1px 5px;
+        }
+
+        .page-cover {
+            page-break-after: always
+        }
+
+        .keep-together {
+            page-break-inside: avoid
+        }
+
+        #findings, #executive {
+            page-break-before: always;
+        }
+
+        .graph {
+            height: 250px;
+            width: 418px;
+        }
+
+        .graph-2x {
+            height: 250px;
+            width: 898px;
+        }
+
+        h6{
+            font-size: 120%;
+            border-bottom: 1px solid black;
+            padding-bottom: 8px;
+            /* h6 is the field label in reports ("Description", "Mitigation").
+               The app stylesheet styles h6 as a small uppercase muted label,
+               which is right for the UI but would restyle every field label in
+               a customer-facing report, so opt out of it here. */
+            text-transform: none;
+            letter-spacing: normal;
+            color: inherit;
+        }
+
+        .panel-heading h6{
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        pre, p {
+            padding: 0;
+            border: 0;
+            background-color: transparent;
+            page-break-inside: auto;
+            margin-bottom: 15px !important;
+        }
+
+        pre {
+            white-space: pre-wrap !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+        }
+
+        .report-field {
+            margin-bottom: 15px !important;
+            overflow-wrap: break-word !important;
+            word-break: normal !important;
+        }
+
+        .report-field pre {
+            white-space: pre-wrap !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background-color: transparent !important;
+            overflow: visible !important;
+            overflow-wrap: break-word !important;
+            word-break: normal !important;
+            margin: 0 !important;
+        }
+
+        ul{
+            margin-bottom: 15px !important;
+        }
+
+        h4, .h4, h5, .h5, h6, .h6 {
+            margin-top: 20px;
+            margin-bottom: 11px;
+        }
+
+        .panel-heading h5 {
+          color: white !important;
+        }
+
+        div.pretty-graphs, .panel, .panel-body {
+            page-break-inside: avoid;
+        }
+
+        *, pre {
+            font-family: 'Roboto Slab', monospace !important;
+            font-size: 13px;
+        }
+
+        /* That `*` rule sets font-family with !important, which also overrode
+           the icon font on Font Awesome elements and rendered every icon in a
+           report as a missing glyph. Put the icon font back. */
+        .fa, .fa-solid, .fa-regular, .fa-brands,
+        .fa::before, .fa-solid::before, .fa-regular::before, .fa-brands::before {
+            font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important;
+        }
+
+        /* Heading scale. The `*` rule above sets every element to 13px; element
+           selectors outrank it, which is how the headings kept their sizes when
+           a full Bootstrap build was loaded here. The stylesheet now in use
+           resets headings to inherit (in @layer base, which the unlayered `*`
+           rule beats), so the scale has to be stated explicitly or every
+           heading collapses to body size. */
+        h1 { font-size: 36px; }
+        h2 { font-size: 30px; }
+        h3 { font-size: 24px; }
+        h4 { font-size: 18px; }
+        h5 { font-size: 14px; }
+
+        .flot-tick-label.tickLabel {
+            font-size: 11px;
+        }
+
+        .raw_request {
+            font-family: "Courier New", Courier, "Lucida Sans Typewriter", "Lucida Typewriter", monospace !important;
+        }
+
+        .panel-warning .panel-heading h4{
+            color: #fff;
+        }
+
+        @media not print {
+            .report-page-break {
+                display: flex;
+                align-items: center;
+                text-align: center;
+            }
+            .report-page-break::before,
+            .report-page-break::after {
+                content: '';
+                flex: 1;
+                border-bottom: 1px dashed #000;
+            }
+            .report-page-break:not(:empty)::before {
+                margin-right: 0.25em;
+            }
+            .report-page-break:not(:empty)::after {
+                margin-left: 0.25em;
+            }
+        }
+
+        @media print {
+            .report-page-break {
+                page-break-after: always;
+                visibility: hidden;
+            }
+        }
+    </style>
+</head>
+<body>
+{# company: header on every generated report; the rest of this file is a copy of dojo/templates/report_base.html, re-sync it on upstream merges #}
+<div class="company-report-header" style="display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid #e5e7eb;">
+    <img src="{% static 'dojo/company/logo.png' %}" alt="{{ COMPANY_NAME }}" style="height:32px;width:auto;">
+    <span style="font-size:1.1rem;font-weight:600;">{{ COMPANY_NAME }}</span>
+    <span style="margin-left:auto;color:#6b7280;font-size:0.875rem;">{{ report_name }}</span>
+</div>
+{% block content %}
+    {{ block.super }}
+{% endblock %}
+{% block js %}
+{% endblock %}
+</body>
+</html>

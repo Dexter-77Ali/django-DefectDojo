@@ -52,7 +52,7 @@ If a change truly must land in one of these: smallest possible diff, marked with
 Windows 10, Docker Desktop (WSL 2 backend, disk image on E:), Git Bash, no Python on the host. Docker Desktop does not auto-start.
 
 - The stack runs in dev mode: `docker compose up -d` (UI http://localhost:8080, mailhog http://localhost:8025, Postgres on 5432). `docker-compose.override.yml` is a plain copy of the dev override because Git Bash `ln -s` copies; `docker/setEnv.sh` therefore always reports release mode. Switch modes by passing `-f docker-compose.yml -f docker-compose.override.<mode>.yml` explicitly, or `rm docker-compose.override.yml` to return to release mode.
-- Source is bind-mounted at `/app`; uwsgi reloads on `.py` changes, templates re-render per request, static files under `dojo/static/dojo` are served live.
+- Source is bind-mounted at `/app`; uwsgi reloads on `.py` changes, templates re-render per request, static files under `dojo/static/dojo` are served live. Changes to `dojo/settings/local_settings.py` need `docker compose restart uwsgi celeryworker celerybeat nginx` (nginx included: it caches the uwsgi container address and answers 502 otherwise).
 - Single test: `bash ./run-unittest.sh -t unittests.company.test_x.TestX -f`, or `docker compose exec -T uwsgi python manage.py test <dotted.path> --keepdb -v2`. CI-equivalent full run uses the `unit_tests_cicd` override (see the Tests and CI note). The shipped skills `defectdojo-dev` (test loop, API token) and `defectdojo-parser` apply.
 - `manage.py`, migrations and `scripts/check_migration_leaves.py` run inside the uwsgi container only.
 - Lint: `MSYS_NO_PATHCONV=1 docker run --rm -v /e/defectdojo:/app -w /app python:3.14-slim sh -c "pip install -q ruff==0.16.5 && ruff check ."`
