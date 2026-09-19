@@ -1,0 +1,23 @@
+# company: company-only dependencies layered on the upstream django image.
+#
+# The upstream Dockerfile.django-debian stays untouched. Build the upstream image first
+# (release or development target, whichever the compose files select), then layer this one:
+#
+#   docker compose -f docker-compose.yml [-f docker-compose.override.yml] build uwsgi
+#   docker compose -f docker-compose.yml [-f docker-compose.override.yml] -f docker-compose.company.yml build uwsgi
+#
+# docker-compose.company.yml passes the upstream tag as BASE_IMAGE and names the result
+# defectdojo/defectdojo-django:<version>-company.
+ARG BASE_IMAGE=defectdojo/defectdojo-django:latest
+FROM ${BASE_IMAGE}
+ARG uid=1001
+
+USER root
+COPY requirements-company.txt /tmp/requirements-company.txt
+# python-ldap ships as source only: build it, keep the runtime libraries, drop the toolchain.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential libldap2-dev libsasl2-dev && \
+    pip install --no-cache-dir -r /tmp/requirements-company.txt && \
+    apt-get purge -y --auto-remove build-essential && \
+    rm -rf /var/lib/apt/lists/* /tmp/requirements-company.txt
+USER ${uid}

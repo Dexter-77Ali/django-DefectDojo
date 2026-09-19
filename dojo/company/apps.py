@@ -36,3 +36,10 @@ class CompanyConfig(AppConfig):
             except ImportError as e:
                 msg = f"NOTIFICATION_MANAGER = {manager!r} cannot be imported"
                 raise ImproperlyConfigured(msg) from e
+        # The LDAP backend needs django-auth-ldap, which only the company image installs.
+        if getattr(settings, "COMPANY_LDAP_ENABLED", False):
+            try:
+                import_string("dojo.company.ldap_backend.CompanyLDAPBackend")
+            except ImportError as e:
+                msg = "DD_COMPANY_LDAP_ENABLED is on but django-auth-ldap is missing; build with Dockerfile.company"
+                raise ImproperlyConfigured(msg) from e

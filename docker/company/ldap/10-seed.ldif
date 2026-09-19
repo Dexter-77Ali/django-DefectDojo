@@ -1,0 +1,47 @@
+# company: seed for the local OpenLDAP test directory (docker-compose.company.yml, profile ldap).
+# Test accounts only. Passwords: alice123, bob123, carol123.
+
+dn: ou=users,dc=company,dc=test
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=company,dc=test
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=users,dc=company,dc=test
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Admin
+givenName: Alice
+sn: Admin
+mail: alice@company.test
+userPassword: alice123
+
+dn: uid=bob,ou=users,dc=company,dc=test
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Builder
+givenName: Bob
+sn: Builder
+mail: bob@company.test
+userPassword: bob123
+
+dn: uid=carol,ou=users,dc=company,dc=test
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol Contractor
+givenName: Carol
+sn: Contractor
+mail: carol@company.test
+userPassword: carol123
+
+dn: cn=dojo-admins,ou=groups,dc=company,dc=test
+objectClass: groupOfNames
+cn: dojo-admins
+member: uid=alice,ou=users,dc=company,dc=test
+
+dn: cn=dojo-pt-Research and Development,ou=groups,dc=company,dc=test
+objectClass: groupOfNames
+cn: dojo-pt-Research and Development
+member: uid=bob,ou=users,dc=company,dc=test

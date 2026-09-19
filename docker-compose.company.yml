@@ -1,0 +1,63 @@
+# company: company layer over docker-compose.yml (and the dev override in dev mode).
+#
+# Select it together with the upstream files, in this order (explicit -f flags work on every
+# platform; COMPOSE_FILE needs ':' as separator on Linux/macOS and ';' on Windows):
+#   F="-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.company.yml"
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml build uwsgi   # upstream image (unchanged Dockerfile)
+#   docker compose $F build uwsgi                                                      # + Dockerfile.company layer
+#   docker compose $F --profile ldap up -d                                             # ldap profile = local test directory
+#
+# Every DD_COMPANY_* value has a workstation default; production sets them from the
+# environment or DD_*_FILE secrets. Nothing secret belongs in this file.
+
+x-company-django: &company-django
+  image: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}-company"
+  build: !override
+    context: .
+    dockerfile: Dockerfile.company
+    args:
+      BASE_IMAGE: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+
+x-company-env: &company-env
+  DD_COMPANY_NAME: "${DD_COMPANY_NAME:-Company}"
+  DD_COMPANY_ESCALATION_EMAILS: "${DD_COMPANY_ESCALATION_EMAILS:-}"
+  DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
+  # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
+  DD_COMPANY_LDAP_PROFILE: "${DD_COMPANY_LDAP_PROFILE:-ad}"
+  DD_COMPANY_LDAP_SERVER_URI: "${DD_COMPANY_LDAP_SERVER_URI:-ldap://ldap:389}"
+  DD_COMPANY_LDAP_START_TLS: "${DD_COMPANY_LDAP_START_TLS:-False}"
+  DD_COMPANY_LDAP_BIND_DN: "${DD_COMPANY_LDAP_BIND_DN:-cn=admin,dc=company,dc=test}"
+  DD_COMPANY_LDAP_BIND_PASSWORD: "${DD_COMPANY_LDAP_BIND_PASSWORD:-}"
+  DD_COMPANY_LDAP_USER_BASE: "${DD_COMPANY_LDAP_USER_BASE:-ou=users,dc=company,dc=test}"
+  DD_COMPANY_LDAP_GROUP_BASE: "${DD_COMPANY_LDAP_GROUP_BASE:-ou=groups,dc=company,dc=test}"
+  DD_COMPANY_LDAP_ADMIN_GROUP: "${DD_COMPANY_LDAP_ADMIN_GROUP:-cn=dojo-admins,ou=groups,dc=company,dc=test}"
+  DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX: "${DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX:-dojo-pt-}"
+
+services:
+  uwsgi:
+    <<: *company-django
+    environment: *company-env
+  celerybeat:
+    <<: *company-django
+    environment: *company-env
+  celeryworker:
+    <<: *company-django
+    environment: *company-env
+  initializer:
+    <<: *company-django
+    environment: *company-env
+
+  # Local test directory, only with `--profile ldap`. Seeded from docker/company/ldap/*.ldif
+  # (users alice/bob/carol, groups dojo-admins and dojo-pt-<product type>). Not for production.
+  ldap:
+    image: osixia/openldap:1.5.0
+    profiles:
+      - ldap
+    command: --copy-service
+    environment:
+      LDAP_ORGANISATION: "Company"
+      LDAP_DOMAIN: "company.test"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_TLS: "false"
+    volumes:
+      - ./docker/company/ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro

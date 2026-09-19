@@ -32,6 +32,14 @@ COMPANY_NAME = env("DD_COMPANY_NAME", default="Company")  # noqa: F821
 FINDING_SLA_PERIOD_METHOD = "dojo.company.sla.finding_sla_period"
 FINDING_SLA_EXPIRATION_CALCULATION_METHOD = "dojo.company.sla.update_sla_expiration_dates"
 
+# --- LDAP / Active Directory login (see dojo/company/ldap.py) ---------------------
+# Off by default; the company image (Dockerfile.company) carries django-auth-ldap.
+COMPANY_LDAP_ENABLED = env.bool("DD_COMPANY_LDAP_ENABLED", default=False)  # noqa: F821
+if COMPANY_LDAP_ENABLED:
+    from dojo.company.ldap import configure as _configure_company_ldap
+
+    _configure_company_ldap(globals(), env)  # noqa: F821
+
 # --- notifications (see dojo/company/notifications.py) ----------------------------
 NOTIFICATION_MANAGER = "dojo.company.notifications.CompanyNotificationManager"
 COMPANY_ESCALATION_EMAILS = env.list("DD_COMPANY_ESCALATION_EMAILS", default=[])  # noqa: F821
