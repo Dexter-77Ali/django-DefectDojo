@@ -162,3 +162,6 @@ MEMORY.md
 .claude/settings.local.json
 CLAUDE.md
 CLAUDE.local.md
+
+# company: files the fork commits on purpose (upstream ignores them)
+!CLAUDE.md
