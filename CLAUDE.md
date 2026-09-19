@@ -9,7 +9,7 @@ This checkout is the company fork of DefectDojo. The upstream development guide 
 - Remotes: `origin` = `Dexter-77Ali/django-DefectDojo` (the fork), `upstream` = `DefectDojo/django-DefectDojo`.
 - `master` is a fast-forward-only mirror of `upstream/master`. Never commit on it; the checked-in branch guard blocks edits there.
 - `company/main` carries all company work. Topic branches are cut from and merged back into `company/main`. The upstream `dev`/`bugfix` branch check in the imported guide only matters when preparing an upstream contribution.
-- Base version 3.3.1. Every upstream tag (monthly `x.y.0`, weekly `x.y.N00`) is merged into `company/main` as a real merge commit; see the release-merge checklist in the vault's `Fork Strategy.md`.
+- Base version 3.3.100 (3.3.1 plus the weekly patch merged 2026-09-19). Every upstream tag (monthly `x.y.0`, weekly `x.y.N00`) is merged into `company/main` as a real merge commit; see the release-merge checklist in the vault's `Fork Strategy.md`.
 - The company build id is the image tag (`3.3.1-company.N`) plus `DD_FOOTER_VERSION`. The three version files (`dojo/__init__.py`, `components/package.json`, `helm/defectdojo/Chart.yaml`) are never edited.
 
 ## Never edit (conflicts on every upstream merge)
