@@ -31,3 +31,11 @@ COMPANY_NAME = env("DD_COMPANY_NAME", default="Company")  # noqa: F821
 # would otherwise silently fall back to upstream behaviour.
 FINDING_SLA_PERIOD_METHOD = "dojo.company.sla.finding_sla_period"
 FINDING_SLA_EXPIRATION_CALCULATION_METHOD = "dojo.company.sla.update_sla_expiration_dates"
+
+# --- notifications (see dojo/company/notifications.py) ----------------------------
+NOTIFICATION_MANAGER = "dojo.company.notifications.CompanyNotificationManager"
+COMPANY_ESCALATION_EMAILS = env.list("DD_COMPANY_ESCALATION_EMAILS", default=[])  # noqa: F821
+COMPANY_ESCALATION_EVENTS = env.list(  # noqa: F821
+    "DD_COMPANY_ESCALATION_EVENTS",
+    default=["sla_breach", "sla_breach_combined", "risk_acceptance_expiration"],
+)

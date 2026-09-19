@@ -19,6 +19,8 @@ class CompanyConfig(AppConfig):
     verbose_name = "Company customizations"
 
     def ready(self):
+        from django.utils.module_loading import import_string  # noqa: PLC0415 -- app registry must be ready
+
         from dojo.utils import get_custom_method  # noqa: PLC0415 -- app registry must be ready
 
         for name in HOOK_SETTINGS:
@@ -26,3 +28,11 @@ class CompanyConfig(AppConfig):
             if dotted and get_custom_method(name) is None:
                 msg = f"{name} = {dotted!r} cannot be imported"
                 raise ImproperlyConfigured(msg)
+        # dojo.notifications.helper resolves this one with suppress(ModuleNotFoundError)
+        manager = getattr(settings, "NOTIFICATION_MANAGER", None)
+        if isinstance(manager, str):
+            try:
+                import_string(manager)
+            except ImportError as e:
+                msg = f"NOTIFICATION_MANAGER = {manager!r} cannot be imported"
+                raise ImproperlyConfigured(msg) from e
