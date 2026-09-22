@@ -5,6 +5,7 @@ from io import StringIO
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.test import override_settings
 
 from dojo.company import fields
 from dojo.models import DojoMeta, Product
@@ -12,6 +13,7 @@ from unittests.dojo_test_case import DojoTestCase, versioned_fixtures
 
 
 @versioned_fixtures
+@override_settings(COMPANY_FIELDS=None)  # the container may carry a company profile; test the code defaults
 class TestCompanyFields(DojoTestCase):
     fixtures = ["dojo_testdata.json"]
 

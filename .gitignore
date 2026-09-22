@@ -167,3 +167,4 @@ CLAUDE.local.md
 !CLAUDE.md
 !dojo/settings/local_settings.py
 secrets/
+!companies/**

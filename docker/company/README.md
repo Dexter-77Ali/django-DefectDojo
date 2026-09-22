@@ -36,6 +36,20 @@ owner by default (`ghcr.io/<owner>/defectdojo-django:<tag>` is the company layer
 To build locally instead: build the upstream image with `-f docker-compose.yml`, then the
 company layer with `-f docker-compose.yml -f docker-compose.company.yml`.
 
+## Company profiles
+
+A profile is a folder `companies/<name>/` with `<name>.env` (non-secret `DD_COMPANY_*`
+values) and `assets/` (`icon.png`, `logo.png` for the company layout; optional `favicon.png`,
+`login-logo.png`, `chop.png` replacing the upstream images). Apply one with
+
+```bash
+bash docker/company/apply-profile.sh zaincash
+docker compose --env-file companies/zaincash/zaincash.env $F up -d
+```
+
+Assets are baked into the images, so build (or tag a release) after applying a profile;
+variables are read at container start. Secrets never go into a profile.
+
 ## Per-company configuration
 
 | Variable | Effect | Default |

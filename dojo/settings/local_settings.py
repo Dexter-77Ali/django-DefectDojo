@@ -26,12 +26,19 @@ _context_processors[_context_processors.index("dojo.context_processors.globalize
 # --- company values (DD_* environment variables; defaults are placeholders) ---
 # One build serves several companies: everything below is configuration.
 COMPANY_NAME = env("DD_COMPANY_NAME", default="Company")  # noqa: F821
+
+
+def _company_json(name, default):
+    """JSON from the environment; unset or empty (compose passes empty defaults) means the code default."""
+    return env.json(name, default=default) if env(name, default="").strip() else default  # noqa: F821
+
+
 # {"50": "#e6f4f3", ..., "900": "#0a2b29"}: overrides the --color-dd-primary-N tokens at runtime (any subset).
-COMPANY_PALETTE = env.json("DD_COMPANY_PALETTE", default={})  # noqa: F821
+COMPANY_PALETTE = _company_json("DD_COMPANY_PALETTE", {})
 # {"critical": 0.5, "high": 0.75, "medium": 1.0, "low": 1.5}: SLA day multipliers per company:criticality.
-COMPANY_SLA_FACTORS = env.json("DD_COMPANY_SLA_FACTORS", default=None)  # noqa: F821
+COMPANY_SLA_FACTORS = _company_json("DD_COMPANY_SLA_FACTORS", None)
 # {"owner-team": {"label": "Owner team"}, "criticality": {"label": "...", "choices": [...]}}: replaces the default fields.
-COMPANY_FIELDS = env.json("DD_COMPANY_FIELDS", default=None)  # noqa: F821
+COMPANY_FIELDS = _company_json("DD_COMPANY_FIELDS", None)
 
 # --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
 # Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here

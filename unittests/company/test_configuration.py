@@ -10,6 +10,7 @@ from dojo.models import Product
 from unittests.dojo_test_case import DojoTestCase, versioned_fixtures
 
 
+@override_settings(COMPANY_FIELDS=None, COMPANY_SLA_FACTORS=None)  # the container may carry a company profile
 class TestConfiguredFieldsAndFactors(DojoTestCase):
 
     def test_default_fields(self):

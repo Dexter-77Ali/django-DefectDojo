@@ -1,6 +1,7 @@
 """company: SLA policy hooks (Phase 4c-2)."""
 
 from django.conf import settings
+from django.test import override_settings
 
 from dojo.company import sla
 from dojo.company.fields import set_product_field
@@ -10,6 +11,7 @@ from unittests.dojo_test_case import DojoTestCase, versioned_fixtures
 
 
 @versioned_fixtures
+@override_settings(COMPANY_FIELDS=None, COMPANY_SLA_FACTORS=None)  # test the code defaults, whatever profile the container carries
 class TestCompanySlaPolicy(DojoTestCase):
     fixtures = ["dojo_testdata.json"]
 
