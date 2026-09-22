@@ -20,6 +20,8 @@ x-company-django: &company-django
 
 x-company-env: &company-env
   DD_COMPANY_NAME: "${DD_COMPANY_NAME:-Company}"
+  # upstream's "Upgrade to Pro" banner fetches text from Google Cloud Storage; off for company builds
+  DD_OS_MESSAGE_ENABLED: "${DD_OS_MESSAGE_ENABLED:-False}"
   DD_COMPANY_ESCALATION_EMAILS: "${DD_COMPANY_ESCALATION_EMAILS:-}"
   DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
   # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
