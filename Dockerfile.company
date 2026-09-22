@@ -15,8 +15,12 @@ ARG uid=1001
 USER root
 COPY requirements-company.txt /tmp/requirements-company.txt
 # python-ldap ships as source only: build it, keep the runtime libraries, drop the toolchain.
+# The same layer applies Debian security updates and a current setuptools, which the upstream
+# image pins behind (image scans flag both); upstream's application pins are left untouched.
 RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends build-essential libldap2-dev libsasl2-dev && \
+    pip install --no-cache-dir --upgrade setuptools && \
     pip install --no-cache-dir -r /tmp/requirements-company.txt && \
     apt-get purge -y --auto-remove build-essential && \
     rm -rf /var/lib/apt/lists/* /tmp/requirements-company.txt
