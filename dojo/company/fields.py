@@ -1,20 +1,33 @@
 """
 company: typed product fields stored as DojoMeta rows, so no schema change.
 
-Keys are namespaced ``company:<name>``. Values are validated here and by the
-``company_fields`` management command. The upstream "Manage Metadata" page and
-``/api/v2/metadata/`` accept any string, so this module is the source of truth
-and ``manage.py company_fields check`` reports rows that drifted.
+Keys are namespaced ``company:<name>``. The field set is configuration, so one
+build serves several companies: ``COMPANY_FIELDS`` (from ``DD_COMPANY_FIELDS``
+JSON) replaces the defaults below, for example
+
+    {"owner-team": {"label": "Owner team"},
+     "criticality": {"label": "Business criticality", "choices": ["critical", "high", "medium", "low"]}}
+
+Values are validated here and by the ``company_fields`` management command.
+The upstream "Manage Metadata" page and ``/api/v2/metadata/`` accept any
+string, so ``manage.py company_fields check`` reports rows that drifted.
 """
 
 from dataclasses import dataclass
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 
 from dojo.models import DojoMeta, Product
 
 PREFIX = "company:"
 MAX_VALUE_LENGTH = 300  # DojoMeta.value is CharField(300)
+
+DEFAULT_FIELDS = {
+    "owner-team": {"label": "Owner team"},
+    "business-unit": {"label": "Business unit"},
+    "criticality": {"label": "Business criticality", "choices": ["critical", "high", "medium", "low"]},
+}
 
 
 @dataclass(frozen=True)
@@ -43,23 +56,23 @@ class CompanyField:
         return value
 
 
-CRITICALITY_CHOICES = ("critical", "high", "medium", "low")
-
-COMPANY_FIELDS: dict[str, CompanyField] = {
-    f.key: f
-    for f in (
-        CompanyField(f"{PREFIX}owner-team", "Owner team"),
-        CompanyField(f"{PREFIX}business-unit", "Business unit"),
-        CompanyField(f"{PREFIX}criticality", "Business criticality", CRITICALITY_CHOICES),
-    )
-}
+def registry() -> dict[str, CompanyField]:
+    """The configured fields keyed by full metadata key (settings win over the defaults)."""
+    raw = getattr(settings, "COMPANY_FIELDS", None) or DEFAULT_FIELDS
+    fields = {}
+    for name, raw_spec in raw.items():
+        key = name if name.startswith(PREFIX) else f"{PREFIX}{name}"
+        spec = raw_spec or {}
+        fields[key] = CompanyField(key, str(spec.get("label") or name), tuple(str(c).lower() for c in spec.get("choices", ())))
+    return fields
 
 
 def _field(key: str) -> CompanyField:
+    fields = registry()
     try:
-        return COMPANY_FIELDS[key]
+        return fields[key]
     except KeyError:
-        msg = f"unknown company field {key!r}; known: {', '.join(COMPANY_FIELDS)}"
+        msg = f"unknown company field {key!r}; known: {', '.join(fields)}"
         raise ValidationError(msg) from None
 
 

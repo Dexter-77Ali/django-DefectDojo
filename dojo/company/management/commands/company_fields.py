@@ -34,7 +34,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         action = options["action"]
         if action == "list":
-            for f in fields.COMPANY_FIELDS.values():
+            for f in fields.registry().values():
                 choices = f" ({', '.join(f.choices)})" if f.choices else ""
                 self.stdout.write(f"{f.key}: {f.label}{choices}")
             return

@@ -5,19 +5,29 @@ Wired from dojo/settings/local_settings.py:
     FINDING_SLA_PERIOD_METHOD = "dojo.company.sla.finding_sla_period"
     FINDING_SLA_EXPIRATION_CALCULATION_METHOD = "dojo.company.sla.update_sla_expiration_dates"
 
-Policy (placeholder until the company fixes its numbers): the product's
-SLA_Configuration days for the finding's severity, scaled by the product's
-business criticality (company field ``company:criticality``):
-critical 0.5, high 0.75, medium 1.0, low 1.5, never below one day.
-A missing or unknown criticality keeps the upstream period unchanged.
+Policy: the product's SLA_Configuration days for the finding's severity,
+scaled by the product's business criticality (company field
+``company:criticality``). The factors are configuration so one build serves
+several companies: ``COMPANY_SLA_FACTORS`` (from ``DD_COMPANY_SLA_FACTORS``
+JSON), placeholder default critical 0.5, high 0.75, medium 1.0, low 1.5.
+Never below one day. A missing or unknown criticality keeps the upstream
+period unchanged.
 """
+
+from django.conf import settings
 
 from dojo.company.fields import PREFIX, get_product_field
 from dojo.sla_config.helpers import update_sla_expiration_dates_sla_config_sync
 
 CRITICALITY_KEY = f"{PREFIX}criticality"
-CRITICALITY_FACTORS = {"critical": 0.5, "high": 0.75, "medium": 1.0, "low": 1.5}
+DEFAULT_FACTORS = {"critical": 0.5, "high": 0.75, "medium": 1.0, "low": 1.5}
 _CACHE_ATTR = "_company_criticality"
+
+
+def factors() -> dict[str, float]:
+    """Criticality to multiplier, from settings with the placeholder defaults as fallback."""
+    configured = getattr(settings, "COMPANY_SLA_FACTORS", None) or DEFAULT_FACTORS
+    return {str(k).lower(): float(v) for k, v in configured.items()}
 
 
 def _upstream_period(finding):
@@ -44,7 +54,7 @@ def finding_sla_period(finding):
     days, enforce = _upstream_period(finding)
     if days is None or not enforce:
         return days, enforce
-    factor = CRITICALITY_FACTORS.get(product_criticality(finding.test.engagement.product) or "", 1.0)
+    factor = factors().get(product_criticality(finding.test.engagement.product) or "", 1.0)
     return max(1, round(days * factor)), enforce
 
 

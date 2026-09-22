@@ -166,3 +166,4 @@ CLAUDE.local.md
 # company: files the fork commits on purpose (upstream ignores them)
 !CLAUDE.md
 !dojo/settings/local_settings.py
+secrets/

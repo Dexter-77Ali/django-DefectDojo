@@ -1,0 +1,50 @@
+# company: Helm values for the unchanged upstream chart in helm/defectdojo.
+#
+#   helm dependency update ./helm/defectdojo
+#   helm install dojo ./helm/defectdojo -f helm/values-company.yaml --set siteUrl=https://dojo.example.com --set host=dojo.example.com
+#
+# UNTESTED: no Kubernetes target existed when this file was written (2026-09-22). It mirrors the
+# compose production layer: company images, DD_COMPANY_* values, pre-created secrets. Validate on
+# the first cluster and update this header.
+#
+# The company local_settings.py is baked into the image, so `localsettingspy` stays empty.
+
+images:
+  django:
+    image:
+      registry: ghcr.io
+      repository: OWNER/defectdojo-django   # company image (Dockerfile.company layer)
+      tag: 3.3.200-company.1
+  nginx:
+    image:
+      registry: ghcr.io
+      repository: OWNER/defectdojo-nginx
+      tag: 3.3.200-company.1
+
+imagePullSecrets: []
+
+# Pre-create the release secret (DD_SECRET_KEY, DD_CREDENTIAL_AES_256_KEY, DD_ADMIN_PASSWORD,
+# METRICS_HTTP_AUTH_PASSWORD) and the database secrets; see helm/defectdojo/README.md.
+createSecret: false
+createPostgresqlSecret: false
+createValkeySecret: false
+
+extraConfigs:
+  DD_COMPANY_NAME: "Company"
+  DD_COMPANY_LDAP_ENABLED: "False"
+  DD_COMPANY_LDAP_PROFILE: "ad"
+  DD_COMPANY_LDAP_SERVER_URI: "ldaps://dc.example.com:636"
+  DD_COMPANY_LDAP_BIND_DN: ""
+  DD_COMPANY_LDAP_USER_BASE: ""
+  DD_COMPANY_LDAP_GROUP_BASE: ""
+  DD_COMPANY_LDAP_ADMIN_GROUP: ""
+  DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX: "dojo-pt-"
+  DD_COMPANY_ESCALATION_EMAILS: ""
+  DD_OS_MESSAGE_ENABLED: "False"
+  DD_FOOTER_VERSION: "3.3.200-company.1"
+
+# Secret values as environment variables: put DD_COMPANY_LDAP_BIND_PASSWORD in an existing
+# Secret and reference it here (extraEnv with secretKeyRef) instead of extraConfigs.
+extraEnv: []
+
+localsettingspy: ""

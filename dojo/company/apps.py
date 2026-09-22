@@ -1,3 +1,5 @@
+import re
+
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -8,11 +10,13 @@ HOOK_SETTINGS = (
     "FINDING_SLA_PERIOD_METHOD",
     "FINDING_SLA_EXPIRATION_CALCULATION_METHOD",
 )
+PALETTE_SHADES = {"50", "100", "200", "300", "400", "500", "600", "700", "800", "900"}
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 class CompanyConfig(AppConfig):
 
-    """Company customizations: templates, static files, context processor, fields, SLA hooks (see CLAUDE.md)."""
+    """Company customizations: templates, static files, context processor, fields, SLA hooks, LDAP (see CLAUDE.md)."""
 
     name = "dojo.company"
     label = "company"
@@ -43,3 +47,26 @@ class CompanyConfig(AppConfig):
             except ImportError as e:
                 msg = "DD_COMPANY_LDAP_ENABLED is on but django-auth-ldap is missing; build with Dockerfile.company"
                 raise ImproperlyConfigured(msg) from e
+        validate_company_configuration()
+
+
+def validate_company_configuration() -> None:
+    """Fail at startup on malformed DD_COMPANY_* JSON instead of at the first request."""
+    palette = getattr(settings, "COMPANY_PALETTE", None) or {}
+    if not isinstance(palette, dict) or any(
+        str(shade) not in PALETTE_SHADES or not HEX_COLOR.match(str(color)) for shade, color in palette.items()
+    ):
+        msg = 'DD_COMPANY_PALETTE must map shades 50..900 to "#rrggbb" colours'
+        raise ImproperlyConfigured(msg)
+    factors = getattr(settings, "COMPANY_SLA_FACTORS", None)
+    if factors is not None and (
+        not isinstance(factors, dict) or any(not isinstance(v, int | float) or v <= 0 for v in factors.values())
+    ):
+        msg = "DD_COMPANY_SLA_FACTORS must map criticality names to positive numbers"
+        raise ImproperlyConfigured(msg)
+    fields = getattr(settings, "COMPANY_FIELDS", None)
+    if fields is not None and (
+        not isinstance(fields, dict) or not fields or any(not isinstance(spec, dict) for spec in fields.values())
+    ):
+        msg = "DD_COMPANY_FIELDS must be a non-empty object of field name to {label, choices}"
+        raise ImproperlyConfigured(msg)

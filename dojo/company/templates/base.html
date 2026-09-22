@@ -17,6 +17,9 @@
 {% block dojo_css %}
     {{ block.super }}
     <link rel="stylesheet" href="{% static 'dojo/company/company.css' %}?v={% static_v 'dojo/company/company.css' %}">
+    {% if COMPANY_PALETTE %}
+    <style id="company-palette">:root{ {% for shade, color in COMPANY_PALETTE.items %}--color-dd-primary-{{ shade }}:{{ color }};{% endfor %} }</style>
+    {% endif %}
 {% endblock %}
 
 {% block footer %}
