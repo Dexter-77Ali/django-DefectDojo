@@ -1,0 +1,66 @@
+# company: CI for the fork's branches.
+#
+# Upstream's unit-tests.yml only triggers for upstream branch names (master, dev,
+# bugfix, release/**, hotfix/**), so company/** branches would get no unit or
+# integration tests. This file chains the same upstream reusable workflows in the
+# same order; the upstream workflow files stay untouched. The images are built from
+# the unchanged upstream Dockerfiles, so the LDAP tests skip here by design (they
+# need the Dockerfile.company layer) and everything else, including
+# unittests/company, runs against the committed dojo/settings/local_settings.py.
+name: Company CI
+
+on:
+  push:
+    branches:
+      - "company/**"
+  pull_request:
+    branches:
+      - "company/**"
+  workflow_dispatch:
+
+concurrency:
+  group: company-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    uses: ./.github/workflows/ruff.yml
+    secrets: inherit
+
+  build-docker-containers:
+    needs: ruff
+    uses: ./.github/workflows/build-docker-images-for-testing.yml
+    secrets: inherit
+    with:
+      platform: linux/amd64
+
+  test-rest-framework:
+    needs: build-docker-containers
+    strategy:
+      fail-fast: false
+      matrix:
+        v3_feature_locations: [ false, true ]
+    uses: ./.github/workflows/rest-framework-tests.yml
+    secrets: inherit
+    with:
+      platform: linux/amd64
+      v3_feature_locations: ${{ matrix.v3_feature_locations }}
+
+  test-user-interface:
+    needs: build-docker-containers
+    uses: ./.github/workflows/integration-tests.yml
+    secrets: inherit
+
+  company-ci-complete:
+    if: always()
+    needs: [ ruff, build-docker-containers, test-rest-framework, test-user-interface ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when any job failed, was cancelled or skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"result": "(failure|cancelled|skipped)"'; then
+            exit 1
+          fi
