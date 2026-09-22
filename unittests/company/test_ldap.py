@@ -123,3 +123,45 @@ class TestBackend(DojoTestCase):
             result = CompanyLDAPBackend().authenticate_ldap_user(FakeLdapUser(), "bob123")
         self.assertIs(result, user)
         self.assertIn("bob", set(product_type.authorized_users.values_list("username", flat=True)))
+
+    def test_directory_account_cannot_claim_a_local_account(self):
+        from django_auth_ldap.backend import _LDAPUser  # noqa: PLC0415, PLC2701 -- company image only
+
+        from dojo.company.ldap_backend import CompanyLDAPBackend  # noqa: PLC0415
+
+        local_admin = self.get_test_admin()
+        self.assertTrue(local_admin.has_usable_password())
+        backend = CompanyLDAPBackend()
+        ldap_user = _LDAPUser(backend, username=local_admin.username)
+        with self.assertRaises(ldap_user.AuthenticationFailed):
+            backend.get_or_build_user(local_admin.username, ldap_user)
+        local_admin.refresh_from_db()
+        self.assertTrue(local_admin.is_superuser)
+
+        directory_user = get_user_model().objects.create_user("dave", "dave@company.test")
+        directory_user.set_unusable_password()
+        directory_user.save()
+        user, built = backend.get_or_build_user("dave", _LDAPUser(backend, username="dave"))
+        self.assertEqual(user.pk, directory_user.pk)
+        self.assertFalse(built)
+
+    def test_inactive_directory_user_cannot_log_in(self):
+        from dojo.company.ldap_backend import CompanyLDAPBackend  # noqa: PLC0415
+
+        user = get_user_model().objects.create_user("frank", "frank@company.test", is_active=False)
+
+        class FakeLdapUser:
+            group_names = set()
+
+        with patch("django_auth_ldap.backend.LDAPBackend.authenticate_ldap_user", return_value=user):
+            self.assertIsNone(CompanyLDAPBackend().authenticate_ldap_user(FakeLdapUser(), "x"))
+
+    def test_deactivated_directory_user_loses_the_session(self):
+        from dojo.company.ldap_backend import CompanyLDAPBackend  # noqa: PLC0415
+
+        user = get_user_model().objects.create_user("erin", "erin@company.test")
+        backend = CompanyLDAPBackend()
+        self.assertEqual(backend.get_user(user.pk).pk, user.pk)
+        user.is_active = False
+        user.save()
+        self.assertIsNone(backend.get_user(user.pk))

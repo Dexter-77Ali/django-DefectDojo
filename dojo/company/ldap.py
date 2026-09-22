@@ -17,7 +17,9 @@ Role model of open-source 3.x: superuser, staff (read/write everywhere) and per
 product / product-type authorized users. The directory is authoritative for LDAP
 users: on every login their product-type memberships are set to exactly the
 groups they carry. The local ModelBackend stays last so the admin account and
-API token login keep working.
+API token login keep working. Local accounts (usable password) are never matched
+by a directory account of the same name (see ldap_backend.py), and a deactivated
+directory user's session ends on the next request.
 """
 
 import logging

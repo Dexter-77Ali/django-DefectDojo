@@ -74,7 +74,11 @@ in `secrets/dd_company_ldap_bind_password`, `DD_COMPANY_LDAP_USER_BASE` and `_GR
 `DD_COMPANY_LDAP_ADMIN_GROUP` (DN of the admin group). Create one AD group per product type
 named `dojo-pt-<product type name>` (prefix configurable). Members of the admin group become
 superusers; members of a product-type group see that product type; everyone else can log in
-and sees nothing until a group is assigned. The local `admin` account keeps working.
+and sees nothing until a group is assigned. Local accounts (the bootstrap `admin`, break-glass
+and service accounts, i.e. anything with a local password) keep working through the local
+backend and are never matched by a directory account of the same name; a directory user
+named `admin` is rejected by the directory backend. Deactivating a user in DefectDojo ends
+their session on the next request.
 
 ## Backup and restore
 

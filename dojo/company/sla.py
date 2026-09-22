@@ -54,7 +54,9 @@ def finding_sla_period(finding):
     days, enforce = _upstream_period(finding)
     if days is None or not enforce:
         return days, enforce
-    factor = factors().get(product_criticality(finding.test.engagement.product) or "", 1.0)
+    # values written through the upstream metadata UI are not normalised, so normalise here
+    criticality = (product_criticality(finding.test.engagement.product) or "").strip().lower()
+    factor = factors().get(criticality, 1.0)
     return max(1, round(days * factor)), enforce
 
 
