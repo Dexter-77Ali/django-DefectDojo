@@ -31,10 +31,14 @@ docker compose $F logs initializer | grep "Admin password:"   # first boot only;
 
 Images come from the registry the release workflow pushes to: GitHub Packages of the fork
 owner by default (`ghcr.io/<owner>/defectdojo-django:<tag>` is the company layer,
-`<tag>-base` the upstream image, `defectdojo-nginx:<tag>` the static server). Point
-`DD_COMPANY_IMAGE_DJANGO` and `DD_COMPANY_IMAGE_NGINX` at another registry path when needed.
-To build locally instead: build the upstream image with `-f docker-compose.yml`, then the
-company layer with `-f docker-compose.yml -f docker-compose.company.yml`.
+`<tag>-base` the upstream image, `defectdojo-nginx:<tag>` the static server; the packages are
+public, no login needed to pull). Point `DD_COMPANY_IMAGE_DJANGO` and `DD_COMPANY_IMAGE_NGINX`
+at another registry path when needed. To build locally instead: build the upstream image with
+`-f docker-compose.yml`, then the company layer with `-f docker-compose.yml -f docker-compose.company.yml`,
+and build both again after every change: an image built earlier lacks `dojo/company/` and
+`local_settings.py` and runs plain upstream without any error message. The production layer was
+verified on 2026-09-23 from the `3.3.200-company.1` images: HTTPS login, branded dashboard,
+`DEBUG` off, secure cookies, file secrets, scheduled backup.
 
 ## Company profiles
 
