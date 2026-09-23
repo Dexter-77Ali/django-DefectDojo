@@ -3,9 +3,10 @@
 #   helm dependency update ./helm/defectdojo
 #   helm install dojo ./helm/defectdojo -f helm/values-company.yaml --set siteUrl=https://dojo.example.com --set host=dojo.example.com
 #
-# UNTESTED: no Kubernetes target existed when this file was written (2026-09-22). It mirrors the
-# compose production layer: company images, DD_COMPANY_* values, pre-created secrets. Validate on
-# the first cluster and update this header.
+# Validated 2026-09-23 with helm 3.19: `helm lint` clean and `helm template` renders 20 objects with the
+# company images and DD_COMPANY_* values. Not yet installed on a cluster (none exists). It mirrors the
+# compose production layer: company images, DD_COMPANY_* values, pre-created secrets. Validate the
+# install on the first cluster and update this header.
 #
 # The company local_settings.py is baked into the image, so `localsettingspy` stays empty.
 
@@ -21,7 +22,7 @@ images:
       repository: OWNER/defectdojo-nginx
       tag: 3.3.200-company.1
 
-imagePullSecrets: []
+imagePullSecrets: ~   # name of a docker-registry Secret when the GHCR packages are private (string, not a list)
 
 # Pre-create the release secret (DD_SECRET_KEY, DD_CREDENTIAL_AES_256_KEY, DD_ADMIN_PASSWORD,
 # METRICS_HTTP_AUTH_PASSWORD) and the database secrets; see helm/defectdojo/README.md.

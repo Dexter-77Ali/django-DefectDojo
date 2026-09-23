@@ -76,6 +76,45 @@ services:
   valkey:
     restart: unless-stopped
 
+  # Scheduled backups: a pg_dump (custom format) plus a tar of the uploaded files every
+  # DD_COMPANY_BACKUP_INTERVAL seconds (daily) into DD_COMPANY_BACKUP_DIR (a host path, or the
+  # defectdojo_backups volume by default), pruned after DD_COMPANY_BACKUP_KEEP_DAYS. Same postgres
+  # image as the database so pg_dump matches the server. Copy the directory off the host.
+  backup:
+    image: postgres:18.6-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      PGHOST: "${DD_DATABASE_HOST:-postgres}"
+      PGPORT: "${DD_DATABASE_PORT:-5432}"
+      PGUSER: "${DD_DATABASE_USER:-defectdojo}"
+      PGDATABASE: "${DD_DATABASE_NAME:-defectdojo}"
+      DD_COMPANY_BACKUP_INTERVAL: "${DD_COMPANY_BACKUP_INTERVAL:-86400}"
+      DD_COMPANY_BACKUP_KEEP_DAYS: "${DD_COMPANY_BACKUP_KEEP_DAYS:-14}"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        export PGPASSWORD="$$(cat /run/secrets/postgres_password)"
+        while true; do
+          stamp="$$(date +%F-%H%M)"
+          # a failed dump (database still starting, connection lost) retries after a minute, not a day
+          pg_dump -Fc -f "/backups/defectdojo-$$stamp.dump" || { rm -f "/backups/defectdojo-$$stamp.dump"; sleep 60; continue; }
+          echo "database backup defectdojo-$$stamp.dump"
+          tar czf "/backups/media-$$stamp.tgz" -C /media . && echo "media backup media-$$stamp.tgz"
+          find /backups -name 'defectdojo-*.dump' -mtime "+$$DD_COMPANY_BACKUP_KEEP_DAYS" -delete
+          find /backups -name 'media-*.tgz' -mtime "+$$DD_COMPANY_BACKUP_KEEP_DAYS" -delete
+          sleep "$$DD_COMPANY_BACKUP_INTERVAL"
+        done
+    volumes:
+      - "${DD_COMPANY_BACKUP_DIR:-defectdojo_backups}:/backups"
+      - defectdojo_media:/media:ro
+    secrets:
+      - postgres_password
+
+volumes:
+  defectdojo_backups: {}
+
 secrets:
   dd_secret_key:
     file: ./secrets/dd_secret_key

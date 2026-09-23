@@ -82,13 +82,25 @@ their session on the next request.
 
 ## Backup and restore
 
+The production layer runs a `backup` service: every `DD_COMPANY_BACKUP_INTERVAL` seconds
+(default daily) it writes `defectdojo-<stamp>.dump` (pg_dump custom format) and
+`media-<stamp>.tgz` (uploaded files) into `DD_COMPANY_BACKUP_DIR` (a host path, or the
+`defectdojo_backups` volume by default) and deletes files older than
+`DD_COMPANY_BACKUP_KEEP_DAYS` (14). Copy that directory off the host; the service does not.
+
 ```bash
-docker compose $F exec -T postgres pg_dump -U defectdojo -Fc defectdojo > backup-$(date +%F).dump
-docker compose $F exec -T postgres pg_restore -U defectdojo -d defectdojo --clean --if-exists < backup-YYYY-MM-DD.dump
+docker compose $F logs --tail 5 backup                                              # last backups written
+docker compose $F run --rm -v "$PWD:/out" --entrypoint sh backup -c 'cp /backups/* /out/'   # fetch from the volume
+docker compose $F exec -T postgres pg_restore -U defectdojo -d defectdojo --clean --if-exists < defectdojo-<stamp>.dump
+docker run --rm -v defectdojo_defectdojo_media:/media -v "$PWD:/in:ro" alpine sh -c 'rm -rf /media/* && tar xzf /in/media-<stamp>.tgz -C /media'
 ```
 
+The media volume is named `<compose project>_defectdojo_media` (`docker volume ls` shows it);
+stop the stack before restoring into it. A manual dump at any time:
+`docker compose $F exec -T postgres pg_dump -U defectdojo -Fc defectdojo > backup-$(date +%F).dump`.
+
 Back up `./secrets/` separately; without `dd_credential_aes_256_key` stored tool credentials
-cannot be decrypted. Uploaded files live in the `defectdojo_media` volume.
+cannot be decrypted.
 
 ## Upgrade
 
