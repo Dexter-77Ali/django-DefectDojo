@@ -7,6 +7,9 @@ Off unless DD_COMPANY_LDAP_ENABLED=True. dojo/settings/local_settings.py then ca
     DD_COMPANY_LDAP_PROFILE        ad (sAMAccountName, memberOf) | openldap (uid, groupOfNames)
     DD_COMPANY_LDAP_SERVER_URI     ldap://host:389 or ldaps://host:636
     DD_COMPANY_LDAP_START_TLS      True to upgrade a plain connection
+    DD_COMPANY_LDAP_CA_CERT_PATH   PEM file of the CA that issued the directory certificate
+                                   (Active Directory: usually the internal enterprise CA);
+                                   unset or an empty file = the system CA store
     DD_COMPANY_LDAP_BIND_DN / DD_COMPANY_LDAP_BIND_PASSWORD   read-only service account
     DD_COMPANY_LDAP_USER_BASE / DD_COMPANY_LDAP_GROUP_BASE    search bases
     DD_COMPANY_LDAP_ADMIN_GROUP    group DN whose members become superuser + staff
@@ -23,6 +26,7 @@ directory user's session ends on the next request.
 """
 
 import logging
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -66,6 +70,16 @@ def configure(target: dict, env) -> None:
     admin_group = env("DD_COMPANY_LDAP_ADMIN_GROUP", default="")
     if admin_group:
         target["AUTH_LDAP_USER_FLAGS_BY_GROUP"] = {"is_superuser": admin_group, "is_staff": admin_group}
+    ca_path = env("DD_COMPANY_LDAP_CA_CERT_PATH", default="")
+    if ca_path:
+        if not Path(ca_path).is_file():
+            msg = f"DD_COMPANY_LDAP_CA_CERT_PATH {ca_path!r} is not a file"
+            raise ImproperlyConfigured(msg)
+        if Path(ca_path).stat().st_size:  # an empty placeholder file keeps the system CA store
+            target["AUTH_LDAP_GLOBAL_OPTIONS"] = {
+                ldap.OPT_X_TLS_CACERTFILE: ca_path,
+                ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_DEMAND,
+            }
     target["AUTHENTICATION_BACKENDS"] = (BACKEND, *target["AUTHENTICATION_BACKENDS"])
 
 

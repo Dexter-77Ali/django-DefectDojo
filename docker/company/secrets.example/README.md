@@ -10,6 +10,8 @@ replace every value. One file per secret, no trailing newline needed.
 | `postgres_password` | password of the bundled Postgres role `defectdojo` | `openssl rand -base64 24` |
 | `dd_database_url` | `postgresql://defectdojo:<postgres_password>@postgres:5432/defectdojo` | same password as above |
 | `dd_company_ldap_bind_password` | read-only directory bind account (empty file when LDAP is off) | from your directory admins |
+| `dd_company_ldap_ca_cert` | not secret: PEM certificate of the CA that issued the domain controllers' LDAPS certificate (empty file = trust the system CA store) | from your directory or PKI admins (Active Directory: the enterprise root CA, exported as Base-64 X.509) |
+| `dd_email_url` | outgoing mail for notifications and escalation copies, e.g. `smtp+tls://user:password@relay.example.com:587` (STARTTLS) or `smtp+ssl://...:465`; URL-encode special characters in the password | from your mail admins; the placeholder `smtp://localhost:25` sends nothing |
 | `tls/nginx.crt`, `tls/nginx.key` | served by nginx on 443 | your CA, or `openssl req -x509 -newkey rsa:4096 -nodes -days 365 -subj "/CN=dojo.example.com" -keyout tls/nginx.key -out tls/nginx.crt` for a test host |
 
 The files here are placeholders and must not be used as they are.

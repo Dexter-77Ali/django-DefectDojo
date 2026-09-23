@@ -51,9 +51,20 @@ jobs:
     uses: ./.github/workflows/integration-tests.yml
     secrets: inherit
 
+  # every company profile must apply, and every variable it sets must reach the containers
+  profiles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Apply every profile
+        run: for p in companies/*/; do bash docker/company/apply-profile.sh "$(basename "$p")"; done
+
   company-ci-complete:
     if: always()
-    needs: [ ruff, build-docker-containers, test-rest-framework, test-user-interface ]
+    needs: [ ruff, profiles, build-docker-containers, test-rest-framework, test-user-interface ]
     runs-on: ubuntu-latest
     steps:
       - name: Fail when any job failed, was cancelled or skipped

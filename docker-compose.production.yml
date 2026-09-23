@@ -25,6 +25,8 @@ x-django-prod: &django-prod
     DD_CREDENTIAL_AES_256_KEY_FILE: /run/secrets/dd_credential_aes_256_key
     DD_DATABASE_URL_FILE: /run/secrets/dd_database_url
     DD_COMPANY_LDAP_BIND_PASSWORD_FILE: /run/secrets/dd_company_ldap_bind_password
+    DD_COMPANY_LDAP_CA_CERT_PATH: /run/secrets/dd_company_ldap_ca_cert   # a path, not _FILE: libldap reads the file itself
+    DD_EMAIL_URL_FILE: /run/secrets/dd_email_url   # smtp+tls://user:password@relay:587, see secrets.example
     DD_FOOTER_VERSION: "${DD_FOOTER_VERSION:-${DJANGO_VERSION:-latest}}"
     DD_OS_MESSAGE_ENABLED: "False"
   secrets:
@@ -32,6 +34,8 @@ x-django-prod: &django-prod
     - dd_credential_aes_256_key
     - dd_database_url
     - dd_company_ldap_bind_password
+    - dd_company_ldap_ca_cert
+    - dd_email_url
 
 services:
   uwsgi:
@@ -124,5 +128,9 @@ secrets:
     file: ./secrets/dd_database_url
   dd_company_ldap_bind_password:
     file: ./secrets/dd_company_ldap_bind_password
+  dd_company_ldap_ca_cert:
+    file: ./secrets/dd_company_ldap_ca_cert
+  dd_email_url:
+    file: ./secrets/dd_email_url
   postgres_password:
     file: ./secrets/postgres_password

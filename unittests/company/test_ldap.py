@@ -1,10 +1,13 @@
 """company: LDAP login and directory-driven product-type access (Phase 4b)."""
 
 import importlib.util
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
 from dojo.company import ldap as company_ldap
@@ -71,13 +74,14 @@ class TestProductTypeSync(DojoTestCase):
 @unittest.skipUnless(HAS_AUTH_LDAP, "django-auth-ldap is only installed in the company image")
 class TestConfigure(DojoTestCase):
 
-    def _configure(self, profile):
+    def _configure(self, profile, **extra):
         env = FakeEnv({
             "DD_COMPANY_LDAP_PROFILE": profile,
             "DD_COMPANY_LDAP_SERVER_URI": "ldap://ldap:389",
             "DD_COMPANY_LDAP_USER_BASE": "ou=users,dc=company,dc=test",
             "DD_COMPANY_LDAP_GROUP_BASE": "ou=groups,dc=company,dc=test",
             "DD_COMPANY_LDAP_ADMIN_GROUP": "cn=dojo-admins,ou=groups,dc=company,dc=test",
+            **extra,
         })
         target = {"AUTHENTICATION_BACKENDS": ("django.contrib.auth.backends.ModelBackend",)}
         company_ldap.configure(target, env)
@@ -98,10 +102,24 @@ class TestConfigure(DojoTestCase):
         self.assertEqual(type(target["AUTH_LDAP_GROUP_TYPE"]).__name__, "GroupOfNamesType")
 
     def test_unknown_profile_fails_loudly(self):
-        from django.core.exceptions import ImproperlyConfigured  # noqa: PLC0415 -- test-local import
-
         with self.assertRaises(ImproperlyConfigured):
             self._configure("nope")
+
+    def test_internal_ca_certificate(self):
+        import ldap  # noqa: PLC0415 -- company image only
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ca = Path(tmp) / "ca.pem"
+            ca.write_text("-----BEGIN CERTIFICATE-----", encoding="utf-8")
+            options = self._configure("ad", DD_COMPANY_LDAP_CA_CERT_PATH=str(ca))["AUTH_LDAP_GLOBAL_OPTIONS"]
+            self.assertEqual(options, {ldap.OPT_X_TLS_CACERTFILE: str(ca), ldap.OPT_X_TLS_REQUIRE_CERT: ldap.OPT_X_TLS_DEMAND})
+
+            ca.write_text("", encoding="utf-8")  # the empty placeholder from secrets.example: system CA store
+            self.assertNotIn("AUTH_LDAP_GLOBAL_OPTIONS", self._configure("ad", DD_COMPANY_LDAP_CA_CERT_PATH=str(ca)))
+            self.assertNotIn("AUTH_LDAP_GLOBAL_OPTIONS", self._configure("ad"))
+
+            with self.assertRaises(ImproperlyConfigured):  # a typo must not fall back silently
+                self._configure("ad", DD_COMPANY_LDAP_CA_CERT_PATH=str(Path(tmp) / "missing.pem"))
 
 
 @unittest.skipUnless(HAS_AUTH_LDAP, "django-auth-ldap is only installed in the company image")

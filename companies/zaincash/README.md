@@ -1,8 +1,8 @@
 # ZainCash profile: what is in place, what ZainCash still has to supply
 
-Everything below is wired and tested with placeholders (2026-09-23). Each open item names the
-file it goes into and the check that proves it landed. Nothing here is secret; secrets go to
-`./secrets/` on the host that runs the stack (see `docker/company/README.md`).
+Everything below is wired and tested with placeholders (2026-09-23). Each item names the file it
+goes into. Nothing here is secret; secrets go to `./secrets/` on the host that runs the stack
+(see `docker/company/README.md`), never into git, email or chat.
 
 ## Verified so far
 
@@ -10,27 +10,52 @@ file it goes into and the check that proves it landed. Nothing here is secret; s
   `defectdojo-nginx:3.3.200-company.1` (public pull) run the production compose layer with file
   secrets, TLS and this profile: HTTPS login, branded dashboard, `DEBUG=False`, secure cookies,
   scheduled backups. Proven locally with a self-signed certificate.
-- Directory login proven end to end against a test OpenLDAP; the Active Directory profile is
-  the same code with `DD_COMPANY_LDAP_PROFILE=ad`.
+- Directory login proven end to end against a test directory, over plain LDAP and over LDAPS
+  with a private CA (login works with the CA certificate, is refused without it or with a wrong
+  one). Active Directory uses the same code with `DD_COMPANY_LDAP_PROFILE=ad`.
 - Fork CI green; security review closed.
 
-## Open items, owner ZainCash
+## What we need from ZainCash
 
-| # | Input | Where it goes | Proof |
-|---|-------|---------------|-------|
-| 1 | Logo files: sidebar icon (square, shown at 32 px), main logo (login card and footer), favicon | `companies/zaincash/assets/icon.png`, `logo.png`, optional `favicon.png`, `login-logo.png`, `chop.png` (replaces the placeholders there) | `bash docker/company/apply-profile.sh zaincash`, build or tag a release with `profile=zaincash`, open the login page and the dashboard |
-| 2 | Brand colours (10-step ramp, or the primary colour and we derive the ramp) | `DD_COMPANY_PALETTE` in `zaincash.env` | dashboard buttons and links take the colour; malformed JSON fails at container start |
-| 3 | Confirm the four product fields and their choices (owner team, business unit and its five choices, PCI DSS scope, data classification) | `DD_COMPANY_FIELDS` in `zaincash.env` | `manage.py company_fields list` inside the uwsgi container |
-| 4 | SLA policy: days per severity (set in the UI under SLA configuration) and the multiplier per product *Business criticality* | UI for the days; `DD_COMPANY_SLA_FACTORS` in `zaincash.env` for the multipliers (keys: very high, high, medium, low, very low) | a finding on a "very high" product shows the shortened SLA date |
-| 5 | Escalation distribution list and which events (default: SLA breach, combined SLA breach, risk acceptance expiry) | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` in `zaincash.env`; SMTP settings as upstream `DD_EMAIL_URL` | trigger an SLA breach on a test finding, check the mailbox |
-| 6 | Active Directory: LDAPS host, read-only bind account (password as a file secret), user and group base DNs, admin group DN, one AD group per product type named `dojo-pt-<product type name>` | `DD_COMPANY_LDAP_*` in `zaincash.env` (set `DD_COMPANY_LDAP_ENABLED=True`), password in `secrets/dd_company_ldap_bind_password` | log in as a directory user: admin-group member is superuser, product-type group member sees that product type, everyone else sees nothing; the local `admin` still logs in |
-| 7 | Hosting target (a Docker host, or a Kubernetes cluster), DNS name, TLS certificate for it | compose: `DD_SITE_URL`, `DD_ALLOWED_HOSTS`, `secrets/tls/nginx.crt` and `nginx.key`; Kubernetes: `helm/values-company.yaml` with `--set siteUrl --set host` | `docker compose $F up -d` then the login page over HTTPS; backups appear in the `defectdojo_backups` volume |
-| 8 | Where backups are copied off the host | `DD_COMPANY_BACKUP_DIR` or a job that copies the volume | a restore drill from a dump |
+### Brand (marketing)
+
+| # | Input | Format | Goes into |
+|---|-------|--------|-----------|
+| 1 | Main logo (login page, footer) | SVG, or PNG at least 1000 px wide, transparent background | `assets/logo.png`, `assets/login-logo.png` |
+| 2 | Square symbol (sidebar at 32 px, browser tab) | SVG, or PNG at least 512 x 512 | `assets/icon.png`, `assets/favicon.png` |
+| 3 | Brand colours | primary colour as hex (secondary if any), or the brand guidelines PDF | `DD_COMPANY_PALETTE` (we derive the ten shades) |
+
+### Security policy (security team)
+
+| # | Input | Goes into |
+|---|-------|-----------|
+| 4 | Product types (top-level grouping, for example one per business unit) and the applications under each | created in DefectDojo; names must match the AD groups in item 10 |
+| 5 | Confirm the product fields and their choices: owner team, business unit (wallet, merchant-services, agent-network, core-banking, corporate-it), PCI DSS scope, data classification | `DD_COMPANY_FIELDS` |
+| 6 | Days to fix per severity (critical, high, medium, low) and whether business-critical products get shorter deadlines (multiplier per product business criticality: very high, high, medium, low, very low) | SLA configuration in the UI; `DD_COMPANY_SLA_FACTORS` |
+| 7 | Escalation mailbox (SOC distribution list) and which events go there (default: SLA breach, combined SLA breach, risk acceptance expiry) | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` |
+
+### IT and infrastructure
+
+| # | Input | Goes into |
+|---|-------|-----------|
+| 8 | Mail relay: host, port, TLS mode (STARTTLS 587 or TLS 465), sender address (for example `defectdojo@zaincash.iq`), account if the relay needs one | `secrets/dd_email_url` on the server; sender also in System Settings |
+| 9 | Active Directory: domain controller names reachable on LDAPS 636, the CA certificate that issued their LDAPS certificate (Base-64 `.cer`), user and group search base DNs | `DD_COMPANY_LDAP_SERVER_URI`, `_USER_BASE`, `_GROUP_BASE`; CA into `secrets/dd_company_ldap_ca_cert` |
+| 10 | AD groups: one admin group (members become DefectDojo superusers), one group per product type named `dojo-pt-<product type name>`, and one test user in each group | `DD_COMPANY_LDAP_ADMIN_GROUP`; the group names themselves |
+| 11 | Read-only AD service account: its DN, and its password typed into the server by ZainCash IT | `DD_COMPANY_LDAP_BIND_DN`; password into `secrets/dd_company_ldap_bind_password` |
+| 12 | Server: a Linux VM with Docker Engine and the compose plugin (suggested start: 4 vCPU, 16 GB RAM, 100 GB SSD), or a Kubernetes namespace | `docker-compose.production.yml` or `helm/values-company.yaml` |
+| 13 | DNS name for the service (for example `defectdojo.zaincash.iq`) and a TLS certificate with its private key for that name (PEM, full chain) | `DD_SITE_URL`, `DD_ALLOWED_HOSTS`; `secrets/tls/nginx.crt` and `nginx.key` |
+| 14 | Firewall openings: users to the server on 443; server to the domain controllers on 636; server to the mail relay; server to `ghcr.io` on 443 for image pulls (or an internal registry mirror) | network |
+| 15 | Off-host backup target (NFS share, object storage or a backup agent) and how many days to keep | `DD_COMPANY_BACKUP_DIR`, `DD_COMPANY_BACKUP_KEEP_DAYS` |
+| 16 | Named administrators who receive the first local admin password (break-glass account) | handed over on first start |
+
+Assumed until told otherwise: time zone `Asia/Baghdad` (`DD_TIME_ZONE` in `zaincash.env`).
 
 ## Engineering after the inputs arrive
 
-1. Drop the artwork in `assets/`, set the values in `zaincash.env`, run `apply-profile.sh`, tag
-   a release (`3.3.N00-company.M`, workflow input `profile=zaincash`).
-2. One directory validation against the real AD with a test user in each group.
-3. Deploy with the production compose layer (or `helm install`), then a restore drill.
-4. Weekly upstream merge (`Fork Strategy` checklist); next upstream tag expected around 2026-09-28.
+1. Drop the artwork into `assets/`, set the values in `zaincash.env`, run
+   `bash docker/company/apply-profile.sh zaincash`, tag a release (`3.3.N00-company.M`, workflow
+   input `profile=zaincash`).
+2. Fill `./secrets/` on the server from `docker/company/secrets.example/`, start the production
+   layer, log in with a test user from each AD group.
+3. Restore drill from the first backup.
+4. Weekly upstream merge (Fork Strategy checklist); next upstream tag expected around 2026-09-28.

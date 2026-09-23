@@ -22,16 +22,21 @@ x-company-env: &company-env
   DD_COMPANY_NAME: "${DD_COMPANY_NAME:-Company}"
   # upstream's "Upgrade to Pro" banner fetches text from Google Cloud Storage; off for company builds
   DD_OS_MESSAGE_ENABLED: "${DD_OS_MESSAGE_ENABLED:-False}"
+  # local time for UI dates and the daily SLA job (07:30), e.g. Asia/Baghdad
+  DD_TIME_ZONE: "${DD_TIME_ZONE:-UTC}"
   # JSON values (empty = code defaults): palette shades, product field definitions, SLA multipliers
   DD_COMPANY_PALETTE: "${DD_COMPANY_PALETTE:-}"
   DD_COMPANY_FIELDS: "${DD_COMPANY_FIELDS:-}"
   DD_COMPANY_SLA_FACTORS: "${DD_COMPANY_SLA_FACTORS:-}"
   DD_COMPANY_ESCALATION_EMAILS: "${DD_COMPANY_ESCALATION_EMAILS:-}"
+  DD_COMPANY_ESCALATION_EVENTS: "${DD_COMPANY_ESCALATION_EVENTS:-sla_breach,sla_breach_combined,risk_acceptance_expiration}"
   DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
   # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
   DD_COMPANY_LDAP_PROFILE: "${DD_COMPANY_LDAP_PROFILE:-ad}"
   DD_COMPANY_LDAP_SERVER_URI: "${DD_COMPANY_LDAP_SERVER_URI:-ldap://ldap:389}"
   DD_COMPANY_LDAP_START_TLS: "${DD_COMPANY_LDAP_START_TLS:-False}"
+  # PEM of the CA behind the directory certificate (LDAPS or StartTLS); empty = system CA store
+  DD_COMPANY_LDAP_CA_CERT_PATH: "${DD_COMPANY_LDAP_CA_CERT_PATH:-}"
   DD_COMPANY_LDAP_BIND_DN: "${DD_COMPANY_LDAP_BIND_DN:-cn=admin,dc=company,dc=test}"
   DD_COMPANY_LDAP_BIND_PASSWORD: "${DD_COMPANY_LDAP_BIND_PASSWORD:-}"
   DD_COMPANY_LDAP_USER_BASE: "${DD_COMPANY_LDAP_USER_BASE:-ou=users,dc=company,dc=test}"

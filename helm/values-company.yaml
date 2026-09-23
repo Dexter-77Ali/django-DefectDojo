@@ -43,9 +43,15 @@ extraConfigs:
   DD_COMPANY_ESCALATION_EMAILS: ""
   DD_OS_MESSAGE_ENABLED: "False"
   DD_FOOTER_VERSION: "3.3.200-company.1"
+  DD_TIME_ZONE: "UTC"   # e.g. Asia/Baghdad
+  # JSON values (DD_COMPANY_PALETTE, DD_COMPANY_FIELDS, DD_COMPANY_SLA_FACTORS) go here as strings;
+  # leave out DD_COMPANY_ESCALATION_EVENTS unless setting it: an empty value disables escalation.
 
-# Secret values as environment variables: put DD_COMPANY_LDAP_BIND_PASSWORD in an existing
-# Secret and reference it here (extraEnv with secretKeyRef) instead of extraConfigs.
+# Secret values as environment variables: put DD_COMPANY_LDAP_BIND_PASSWORD and DD_EMAIL_URL
+# (smtp+tls://user:password@relay:587) in an existing Secret and reference them here (extraEnv with
+# secretKeyRef) instead of extraConfigs. LDAPS with an internal CA: mount the CA certificate from
+# a ConfigMap through the django and celery extraVolumes / extraVolumeMounts and set
+# DD_COMPANY_LDAP_CA_CERT_PATH in extraConfigs to the mounted file.
 extraEnv: []
 
 localsettingspy: ""

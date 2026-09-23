@@ -52,7 +52,10 @@ docker compose --env-file companies/zaincash/zaincash.env $F up -d
 ```
 
 Assets are baked into the images, so build (or tag a release) after applying a profile;
-variables are read at container start. Secrets never go into a profile.
+variables are read at container start. Secrets never go into a profile. `docker compose
+--env-file` only hands a variable to the containers when a compose file references it, so
+`apply-profile.sh` (and the `profiles` job in company CI) refuses a profile that sets a
+variable no compose file passes on.
 
 ## Per-company configuration
 
@@ -63,6 +66,8 @@ variables are read at container start. Secrets never go into a profile.
 | `DD_COMPANY_FIELDS` | JSON field definitions (label, choices) for product metadata | owner-team, business-unit |
 | `DD_COMPANY_SLA_FACTORS` | JSON product *Business criticality* (upstream product field: very high, high, medium, low, very low, none) → SLA day multiplier | 0.5 / 0.75 / 1.0 / 1.5 / 2.0 |
 | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` | escalation copies | none / SLA and risk-acceptance events |
+| `DD_TIME_ZONE` | local time for UI dates and the daily SLA job (07:30), e.g. `Asia/Baghdad` | `UTC` |
+| `secrets/dd_email_url` | outgoing mail relay for notifications and escalation copies (production layer) | `smtp://localhost:25`, sends nothing |
 | `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, group prefix) | off |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
 
@@ -75,8 +80,11 @@ branch or tag that carries that company's files.
 `DD_COMPANY_LDAP_PROFILE=ad`, `DD_COMPANY_LDAP_SERVER_URI=ldaps://dc.example.com:636`,
 `DD_COMPANY_LDAP_BIND_DN=CN=svc-dojo,OU=Service Accounts,DC=example,DC=com` with the password
 in `secrets/dd_company_ldap_bind_password`, `DD_COMPANY_LDAP_USER_BASE` and `_GROUP_BASE`,
-`DD_COMPANY_LDAP_ADMIN_GROUP` (DN of the admin group). Create one AD group per product type
-named `dojo-pt-<product type name>` (prefix configurable). Members of the admin group become
+`DD_COMPANY_LDAP_ADMIN_GROUP` (DN of the admin group). If the domain controllers' LDAPS certificate comes
+from the internal enterprise CA (the usual case), put that CA certificate (PEM, "Base-64 encoded
+X.509") into `secrets/dd_company_ldap_ca_cert`; the production layer points
+`DD_COMPANY_LDAP_CA_CERT_PATH` at it. Left empty, the system CA store is used. Create one AD
+group per product type named `dojo-pt-<product type name>` (prefix configurable). Members of the admin group become
 superusers; members of a product-type group see that product type; everyone else can log in
 and sees nothing until a group is assigned. Local accounts (the bootstrap `admin`, break-glass
 and service accounts, i.e. anything with a local password) keep working through the local
