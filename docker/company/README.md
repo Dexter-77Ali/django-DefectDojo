@@ -56,8 +56,8 @@ variables are read at container start. Secrets never go into a profile.
 |----------|--------|---------|
 | `DD_COMPANY_NAME` | sidebar, footer, report header, escalation subjects | `Company` |
 | `DD_COMPANY_PALETTE` | JSON `{"50": "#…", …, "900": "#…"}`, recolours the UI at runtime | teal placeholder in `company.css` |
-| `DD_COMPANY_FIELDS` | JSON field definitions (label, choices) for product metadata | owner-team, business-unit, criticality |
-| `DD_COMPANY_SLA_FACTORS` | JSON criticality → SLA day multiplier | 0.5 / 0.75 / 1.0 / 1.5 |
+| `DD_COMPANY_FIELDS` | JSON field definitions (label, choices) for product metadata | owner-team, business-unit |
+| `DD_COMPANY_SLA_FACTORS` | JSON product *Business criticality* (upstream product field: very high, high, medium, low, very low, none) → SLA day multiplier | 0.5 / 0.75 / 1.0 / 1.5 / 2.0 |
 | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` | escalation copies | none / SLA and risk-acceptance events |
 | `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, group prefix) | off |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |

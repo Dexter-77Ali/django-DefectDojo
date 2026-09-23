@@ -15,7 +15,7 @@ class TestConfiguredFieldsAndFactors(DojoTestCase):
 
     def test_default_fields(self):
         keys = set(fields.registry())
-        self.assertEqual(keys, {"company:owner-team", "company:business-unit", "company:criticality"})
+        self.assertEqual(keys, {"company:owner-team", "company:business-unit"})
 
     @override_settings(COMPANY_FIELDS={"cost-centre": {"label": "Cost centre"}, "company:tier": {"label": "Tier", "choices": ["Gold", "silver"]}})
     def test_fields_from_settings_replace_defaults(self):
@@ -24,11 +24,11 @@ class TestConfiguredFieldsAndFactors(DojoTestCase):
         self.assertEqual(registry["company:tier"].choices, ("gold", "silver"))
         self.assertEqual(registry["company:tier"].validate("GOLD"), "gold")
         with self.assertRaises(ValidationError):
-            fields._field("company:criticality")
+            fields._field("company:owner-team")
 
-    @override_settings(COMPANY_SLA_FACTORS={"critical": 0.25, "High": 2})
+    @override_settings(COMPANY_SLA_FACTORS={"very high": 0.25, "High ": 2})
     def test_factors_from_settings(self):
-        self.assertEqual(sla.factors(), {"critical": 0.25, "high": 2.0})
+        self.assertEqual(sla.factors(), {"very high": 0.25, "high": 2.0})
 
     def test_default_factors(self):
         self.assertEqual(sla.factors(), sla.DEFAULT_FACTORS)

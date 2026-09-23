@@ -6,7 +6,10 @@ build serves several companies: ``COMPANY_FIELDS`` (from ``DD_COMPANY_FIELDS``
 JSON) replaces the defaults below, for example
 
     {"owner-team": {"label": "Owner team"},
-     "criticality": {"label": "Business criticality", "choices": ["critical", "high", "medium", "low"]}}
+     "pci-scope": {"label": "PCI DSS scope", "choices": ["in-scope", "out-of-scope"]}}
+
+Business criticality is not a company field: upstream Product already carries
+``business_criticality`` (product edit form), which dojo/company/sla.py reads.
 
 Values are validated here and by the ``company_fields`` management command.
 The upstream "Manage Metadata" page and ``/api/v2/metadata/`` accept any
@@ -26,7 +29,6 @@ MAX_VALUE_LENGTH = 300  # DojoMeta.value is CharField(300)
 DEFAULT_FIELDS = {
     "owner-team": {"label": "Owner team"},
     "business-unit": {"label": "Business unit"},
-    "criticality": {"label": "Business criticality", "choices": ["critical", "high", "medium", "low"]},
 }
 
 

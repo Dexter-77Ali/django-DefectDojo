@@ -51,7 +51,7 @@ class TestConfigurationHardening(DojoTestCase):
         with self.assertRaises(ValidationError):
             fields.registry()["company:owner-team"].validate("x" * (fields.MAX_VALUE_LENGTH + 1))
         with self.assertRaises(ValidationError):
-            fields.registry()["company:criticality"].validate("critical'; DROP TABLE dojo_product; --")
+            fields.CompanyField("company:tier", "Tier", ("gold",)).validate("critical'; DROP TABLE dojo_product; --")
 
 
 @versioned_fixtures

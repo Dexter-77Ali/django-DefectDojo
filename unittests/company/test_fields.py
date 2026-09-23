@@ -11,9 +11,12 @@ from dojo.company import fields
 from dojo.models import DojoMeta, Product
 from unittests.dojo_test_case import DojoTestCase, versioned_fixtures
 
+# the code defaults plus one field with choices, whatever profile the container carries
+FIELDS = {**fields.DEFAULT_FIELDS, "tier": {"label": "Tier", "choices": ["gold", "silver", "bronze"]}}
+
 
 @versioned_fixtures
-@override_settings(COMPANY_FIELDS=None)  # the container may carry a company profile; test the code defaults
+@override_settings(COMPANY_FIELDS=FIELDS)
 class TestCompanyFields(DojoTestCase):
     fixtures = ["dojo_testdata.json"]
 
@@ -29,10 +32,10 @@ class TestCompanyFields(DojoTestCase):
         self.assertEqual(fields.get_product_fields(self.product), {"company:owner-team": "Platform"})
 
     def test_choices_are_normalised_and_enforced(self):
-        row = fields.set_product_field(self.product, "company:criticality", "HIGH")
-        self.assertEqual(row.value, "high")
+        row = fields.set_product_field(self.product, "company:tier", "GOLD")
+        self.assertEqual(row.value, "gold")
         with self.assertRaises(ValidationError):
-            fields.set_product_field(self.product, "company:criticality", "urgent")
+            fields.set_product_field(self.product, "company:tier", "urgent")
 
     def test_unknown_key_and_empty_value_are_rejected(self):
         with self.assertRaises(ValidationError):
@@ -52,25 +55,25 @@ class TestCompanyFields(DojoTestCase):
 
     def test_check_all_reports_drifted_rows(self):
         # rows written through the API or UI bypass validation; check_all must catch them
-        DojoMeta.objects.create(product=self.product, name="company:criticality", value="urgent")
+        DojoMeta.objects.create(product=self.product, name="company:tier", value="urgent")
         problems = fields.check_all()
-        self.assertEqual([(p, k, v) for p, k, v, _ in problems], [(self.product.id, "company:criticality", "urgent")])
+        self.assertEqual([(p, k, v) for p, k, v, _ in problems], [(self.product.id, "company:tier", "urgent")])
 
     def test_management_command(self):
         out = StringIO()
         call_command("company_fields", "list", stdout=out)
-        self.assertIn("company:criticality: Business criticality (critical, high, medium, low)", out.getvalue())
+        self.assertIn("company:tier: Tier (gold, silver, bronze)", out.getvalue())
 
         out = StringIO()
-        call_command("company_fields", "set", str(self.product.id), "company:criticality", "Low", stdout=out)
-        self.assertEqual(fields.get_product_field(self.product, "company:criticality"), "low")
+        call_command("company_fields", "set", str(self.product.id), "company:tier", "Silver", stdout=out)
+        self.assertEqual(fields.get_product_field(self.product, "company:tier"), "silver")
 
         out = StringIO()
         call_command("company_fields", "get", str(self.product.id), stdout=out)
-        self.assertIn("company:criticality=low", out.getvalue())
+        self.assertIn("company:tier=silver", out.getvalue())
 
         with self.assertRaises(CommandError):
-            call_command("company_fields", "set", str(self.product.id), "company:criticality", "urgent")
+            call_command("company_fields", "set", str(self.product.id), "company:tier", "urgent")
         with self.assertRaises(CommandError):
             call_command("company_fields", "get", "999999")
 

@@ -6,28 +6,31 @@ Wired from dojo/settings/local_settings.py:
     FINDING_SLA_EXPIRATION_CALCULATION_METHOD = "dojo.company.sla.update_sla_expiration_dates"
 
 Policy: the product's SLA_Configuration days for the finding's severity,
-scaled by the product's business criticality (company field
-``company:criticality``). The factors are configuration so one build serves
-several companies: ``COMPANY_SLA_FACTORS`` (from ``DD_COMPANY_SLA_FACTORS``
-JSON), placeholder default critical 0.5, high 0.75, medium 1.0, low 1.5.
-Never below one day. A missing or unknown criticality keeps the upstream
-period unchanged.
+scaled by the product's upstream *Business criticality* (the
+``business_criticality`` column on Product, set on the product edit form:
+very high, high, medium, low, very low, none). The factors are configuration
+so one build serves several companies: ``COMPANY_SLA_FACTORS`` (from
+``DD_COMPANY_SLA_FACTORS`` JSON), placeholder default very high 0.5, high 0.75,
+medium 1.0, low 1.5, very low 2.0. Never below one day. A missing or unknown
+criticality keeps the upstream period unchanged.
+
+The column travels with the product row that the default rule already loads,
+so the hook adds no query to Finding.save(): upstream pins query counts around
+it (unittests/test_tag_inheritance_perf.py) and those baselines must keep
+passing on the fork.
 """
 
 from django.conf import settings
 
-from dojo.company.fields import PREFIX, get_product_field
 from dojo.sla_config.helpers import update_sla_expiration_dates_sla_config_sync
 
-CRITICALITY_KEY = f"{PREFIX}criticality"
-DEFAULT_FACTORS = {"critical": 0.5, "high": 0.75, "medium": 1.0, "low": 1.5}
-_CACHE_ATTR = "_company_criticality"
+DEFAULT_FACTORS = {"very high": 0.5, "high": 0.75, "medium": 1.0, "low": 1.5, "very low": 2.0}
 
 
 def factors() -> dict[str, float]:
     """Criticality to multiplier, from settings with the placeholder defaults as fallback."""
     configured = getattr(settings, "COMPANY_SLA_FACTORS", None) or DEFAULT_FACTORS
-    return {str(k).lower(): float(v) for k, v in configured.items()}
+    return {str(k).strip().lower(): float(v) for k, v in configured.items()}
 
 
 def _upstream_period(finding):
@@ -40,22 +43,12 @@ def _upstream_period(finding):
     )
 
 
-def product_criticality(product) -> str | None:
-    """Criticality of a product, cached on the instance for the life of the object."""
-    # ponytail: one query per product instance; importers reuse the instance across
-    # the findings of a test, bulk paths elsewhere would need a real per-request cache.
-    if not hasattr(product, _CACHE_ATTR):
-        setattr(product, _CACHE_ATTR, get_product_field(product, CRITICALITY_KEY))
-    return getattr(product, _CACHE_ATTR)
-
-
 def finding_sla_period(finding):
-    """Return (days, enforce) for the finding, scaled by product criticality."""
+    """Return (days, enforce) for the finding, scaled by the product's business criticality."""
     days, enforce = _upstream_period(finding)
     if days is None or not enforce:
         return days, enforce
-    # values written through the upstream metadata UI are not normalised, so normalise here
-    criticality = (product_criticality(finding.test.engagement.product) or "").strip().lower()
+    criticality = (finding.test.engagement.product.business_criticality or "").strip().lower()
     factor = factors().get(criticality, 1.0)
     return max(1, round(days * factor)), enforce
 
