@@ -6,14 +6,18 @@ goes into. Nothing here is secret; secrets go to `./secrets/` on the host that r
 
 ## Verified so far
 
-- Released images `ghcr.io/dexter-77ali/defectdojo-django:3.3.200-company.1` and
-  `defectdojo-nginx:3.3.200-company.1` (public pull) run the production compose layer with file
-  secrets, TLS and this profile: HTTPS login, branded dashboard, `DEBUG=False`, secure cookies,
-  scheduled backups. Proven locally with a self-signed certificate.
-- Directory login proven end to end against a test directory, over plain LDAP and over LDAPS
-  with a private CA (login works with the CA certificate, is refused without it or with a wrong
-  one). Active Directory uses the same code with `DD_COMPANY_LDAP_PROFILE=ad`.
+- Released images `ghcr.io/dexter-77ali/defectdojo-django:3.3.300-company.1` and
+  `defectdojo-nginx:3.3.300-company.1` (upstream 3.3.300, public pull) run the production
+  compose layer with file secrets, TLS and this profile: HTTPS login, branded dashboard,
+  `DEBUG=False`, secure cookies, time zone, mail relay from its secret file, directory login over
+  LDAPS with the CA from `secrets/dd_company_ldap_ca_cert`, scheduled backups. Proven locally on
+  2026-09-30 with a self-signed certificate and a test directory. Never deploy
+  `3.3.200-company.1`: it predates the LDAP security fixes.
+- Directory login over LDAPS also refuses a missing or wrong CA certificate. Active Directory
+  uses the same code with `DD_COMPANY_LDAP_PROFILE=ad`.
 - Fork CI green; security review closed.
+- The request list below is also published as a page to send to ZainCash ("ZainCash Go-Live
+  Inputs"); share it from its Share menu.
 
 ## What we need from ZainCash
 
@@ -48,7 +52,10 @@ goes into. Nothing here is secret; secrets go to `./secrets/` on the host that r
 | 15 | Off-host backup target (NFS share, object storage or a backup agent) and how many days to keep | `DD_COMPANY_BACKUP_DIR`, `DD_COMPANY_BACKUP_KEEP_DAYS` |
 | 16 | Named administrators who receive the first local admin password (break-glass account) | handed over on first start |
 
-Assumed until told otherwise: time zone `Asia/Baghdad` (`DD_TIME_ZONE` in `zaincash.env`).
+Assumed until told otherwise: time zone `Asia/Baghdad` (`DD_TIME_ZONE` in `zaincash.env`);
+English as the default interface language (upstream ships Arabic, which each person can pick in
+their own settings; making it the default needs `DD_LANGUAGE_CODE=ar` passed through
+`docker-compose.company.yml` first).
 
 ## Engineering after the inputs arrive
 

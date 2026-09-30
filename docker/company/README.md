@@ -21,7 +21,7 @@ this file is the operator's checklist.
 ```bash
 F="-f docker-compose.yml -f docker-compose.company.yml -f docker-compose.production.yml"
 cp -r docker/company/secrets.example secrets && $EDITOR secrets/*   # see secrets.example/README.md
-export DJANGO_VERSION=3.3.200-company.1 NGINX_VERSION=3.3.200-company.1   # a tag published by company-release.yml
+export DJANGO_VERSION=3.3.300-company.1 NGINX_VERSION=3.3.300-company.1   # a tag published by company-release.yml
 export DD_SITE_URL=https://dojo.example.com DD_ALLOWED_HOSTS=dojo.example.com
 export DD_COMPANY_NAME="Example Corp"
 docker compose $F pull
@@ -37,8 +37,13 @@ at another registry path when needed. To build locally instead: build the upstre
 `-f docker-compose.yml`, then the company layer with `-f docker-compose.yml -f docker-compose.company.yml`,
 and build both again after every change: an image built earlier lacks `dojo/company/` and
 `local_settings.py` and runs plain upstream without any error message. The production layer was
-verified on 2026-09-23 from the `3.3.200-company.1` images: HTTPS login, branded dashboard,
-`DEBUG` off, secure cookies, file secrets, scheduled backup.
+verified on 2026-09-30 from the `3.3.300-company.1` images: HTTPS login, branded dashboard,
+`DEBUG` off, secure cookies, file secrets, directory login over LDAPS with the CA from
+`secrets/dd_company_ldap_ca_cert`, scheduled backup.
+
+**Do not deploy `3.3.200-company.1`.** It predates the LDAP security fixes (a directory account
+named like a local account could log in as it; deactivated users kept their session) and has no
+LDAPS CA support. Use `3.3.300-company.1` or later.
 
 ## Company profiles
 

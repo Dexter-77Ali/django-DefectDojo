@@ -1,4 +1,4 @@
-# company: publish release images for a company tag (for example 3.3.200-company.1).
+# company: publish release images for a company tag (for example 3.3.300-company.1).
 #
 # Pushes three images to the registry: the upstream django release image (suffix -base),
 # the company layer on top of it (the tag itself) and the nginx image. The registry defaults
@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing git tag to build, e.g. 3.3.200-company.1"
+        description: "Existing git tag to build, e.g. 3.3.300-company.1"
         required: true
         type: string
       profile:

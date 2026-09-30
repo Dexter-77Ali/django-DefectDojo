@@ -15,12 +15,12 @@ images:
     image:
       registry: ghcr.io
       repository: OWNER/defectdojo-django   # company image (Dockerfile.company layer)
-      tag: 3.3.200-company.1
+      tag: 3.3.300-company.1
   nginx:
     image:
       registry: ghcr.io
       repository: OWNER/defectdojo-nginx
-      tag: 3.3.200-company.1
+      tag: 3.3.300-company.1
 
 imagePullSecrets: ~   # name of a docker-registry Secret when the GHCR packages are private (string, not a list)
 
@@ -42,7 +42,7 @@ extraConfigs:
   DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX: "dojo-pt-"
   DD_COMPANY_ESCALATION_EMAILS: ""
   DD_OS_MESSAGE_ENABLED: "False"
-  DD_FOOTER_VERSION: "3.3.200-company.1"
+  DD_FOOTER_VERSION: "3.3.300-company.1"
   DD_TIME_ZONE: "UTC"   # e.g. Asia/Baghdad
   # JSON values (DD_COMPANY_PALETTE, DD_COMPANY_FIELDS, DD_COMPANY_SLA_FACTORS) go here as strings;
   # leave out DD_COMPANY_ESCALATION_EVENTS unless setting it: an empty value disables escalation.
