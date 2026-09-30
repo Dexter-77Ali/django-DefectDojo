@@ -10,17 +10,23 @@ import inspect
 from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.template import engines
 from django.template.loader_tags import BlockNode
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 import dojo
 from dojo.authorization.url_permissions import URL_PERMISSIONS
+from dojo.importers.auto_create_context import AutoCreateContextManager
+from dojo.importers.options import ImporterOptions
 from dojo.importers.services import ImportResult, auto_import_scan
-from dojo.models import Dojo_User
+from dojo.jira import services as jira_services
+from dojo.models import Dojo_User, Engagement, JIRA_Project, Test, Test_Type
 from dojo.risk_acceptance import helper as ra_helper
+from dojo.utils import grade_debounce_cache_key
 from unittests.dojo_test_case import DojoTestCase, get_unit_tests_scans_path, versioned_fixtures
 
 # URL names the company layer links to, hides or builds on, with sample arguments.
@@ -109,6 +115,20 @@ class TestUpstreamContract(DojoTestCase):
             self.assertIn(name, parameters, name)
         fields = set(inspect.signature(ImportResult).parameters)
         self.assertLessEqual({"test", "new", "closed", "reactivated", "untouched"}, fields)
+        # Phase 2 quick upload resolves the upload engagement the way auto_import_scan does
+        parameters = inspect.signature(AutoCreateContextManager.get_target_engagement_if_exists).parameters
+        self.assertLessEqual({"engagement_name", "product"}, set(parameters))
+        # ... and pushes to JIRA like the import endpoints: push_to_jira reaches the importer through **kwargs
+        self.assertIn("obj", inspect.signature(jira_services.get_project).parameters)
+        self.assertIn("push_all_issues", {field.name for field in JIRA_Project._meta.get_fields()})
+        self.assertIn('"push_to_jira"', inspect.getsource(ImporterOptions.validate_push_to_jira))
+
+    def test_tab_bar_markers(self):
+        # Phase 2 test_quick_upload checks the company tab bar links between these upstream comments
+        html = (Path(dojo.__file__).parent / "templates" / "base.html").read_text(encoding="utf-8")
+        start, block, end = html.index("<!-- start of tabs -->"), html.index("{% block tab_bar %}"), html.index("<!-- end of tabs -->")
+        self.assertLess(start, block)
+        self.assertLess(block, end)
 
     def test_risk_acceptance_helpers(self):
         # Phase 4 approve (add findings, note), Phase 5 extend and let expire, request form default
@@ -159,6 +179,8 @@ class TestUpstreamContractWithData(DojoTestCase):
         }
         sample = (get_unit_tests_scans_path("zap") / "0_zap_sample.xml").read_bytes()
         first = auto_import_scan(scan_file=SimpleUploadedFile("0_zap_sample.xml", sample), **target)
+        # drop the grading debounce marker, as test_quick_upload does (it would leak into the next class)
+        self.addCleanup(cache.delete, grade_debounce_cache_key(first.test.engagement.product_id))
         finding = first.test.finding_set.order_by("id").first()
         finding.tags.add("team:x")
 
@@ -168,3 +190,16 @@ class TestUpstreamContractWithData(DojoTestCase):
         self.assertEqual(second.test.id, first.test.id)
         finding.refresh_from_db()
         self.assertIn("team:x", {tag.name for tag in finding.tags.all()})
+
+    def test_blank_test_title_targets_the_last_test_of_the_scanner(self):
+        # Phase 2 quick upload requires a component once a scanner has several or named tests, because a
+        # blank title re-imports into the engagement's LAST test of that scanner, whatever its title
+        engagement = Engagement.objects.order_by("id").first()
+        test_type = Test_Type.objects.get_or_create(name="ZAP Scan")[0]
+        dates = {"target_start": timezone.now(), "target_end": timezone.now()}
+        Test.objects.create(engagement=engagement, test_type=test_type, scan_type="ZAP Scan", title="api", **dates)
+        last = Test.objects.create(engagement=engagement, test_type=test_type, scan_type="ZAP Scan", title="web", **dates)
+        target = AutoCreateContextManager().get_target_test_if_exists(
+            test_title=None, scan_type="ZAP Scan", engagement=engagement,
+        )
+        self.assertEqual(target, last)

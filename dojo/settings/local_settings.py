@@ -44,6 +44,8 @@ COMPANY_SLA_FACTORS = _company_json("DD_COMPANY_SLA_FACTORS", None)
 COMPANY_FIELDS = _company_json("DD_COMPANY_FIELDS", None)
 # Engagement that UI uploads and CI re-imports share, so fixed findings close across both.
 COMPANY_UPLOAD_ENGAGEMENT_NAME = env("DD_COMPANY_UPLOAD_ENGAGEMENT_NAME", default="Security scans")  # noqa: F821
+# Scanner allowlist applied by `manage.py company_scan_types` (comma separated scan types); empty = every scanner.
+COMPANY_SCAN_TYPES = env.list("DD_COMPANY_SCAN_TYPES", default=[])  # noqa: F821
 
 # --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
 # Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here

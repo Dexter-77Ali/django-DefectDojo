@@ -75,6 +75,7 @@ variable no compose file passes on.
 | `secrets/dd_email_url` | outgoing mail relay for notifications and escalation copies (production layer) | `smtp://localhost:25`, sends nothing |
 | `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, group prefix) | off |
 | `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` | engagement that UI uploads and CI re-imports share, so a fixed finding closes whichever way the next scan arrives | `Security scans` |
+| `DD_COMPANY_SCAN_TYPES` | scanner allowlist, comma separated scan types, applied by `manage.py company_scan_types` (see *Scanner allowlist*) | empty: every scanner |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
 
 Logo files (`dojo/static/dojo/company/icon.png`, `logo.png`) and the upstream login logo and
@@ -122,6 +123,28 @@ build or a restart.
    `engagement_name` must equal `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` (default `Security scans`) so UI
    uploads and CI share one history. `test_title` names the component (repository or service): each
    component gets its own test, so one pipeline never closes another component's findings.
+
+   People upload from *Upload scan* in the sidebar (`/company/upload`), or with *Upload report* on a
+   product page and *Upload new report* on a test page. That page writes to the same engagement, with
+   its *Component* field as `test_title`; the full upstream import form stays behind *All options…*.
+
+## Scanner allowlist
+
+Upload pages list about 400 scanners. To show only the ones the company uses, set
+`DD_COMPANY_SCAN_TYPES` to their exact names, comma separated (for example
+`ZAP Scan,Trivy Scan,Semgrep JSON Report`; include every scanner a pipeline uploads), run the full
+`up -d` so the containers receive it, then:
+
+```bash
+docker compose $F exec uwsgi python manage.py company_scan_types
+docker compose $F restart uwsgi celeryworker   # the v2 API reads the scanner list at startup
+```
+
+The command deactivates every parser scan type that is not listed and has no tests, reactivates the
+listed ones, and prints each change. Manual test types (such as *Pen Test*) and scanners that already
+have tests are left as they are, so their history stays filterable. With the variable empty it changes
+nothing. A deactivated scanner disappears from the upload pages and the API rejects it ("Parser … is
+not active"); list it and run the command again, or tick it under Engagements > Test Types.
 
 ## LDAP against Active Directory
 

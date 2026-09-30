@@ -19,3 +19,41 @@
   --color-dd-primary-800: #10413e;
   --color-dd-primary-900: #0a2b29;
 }
+
+/* Quick upload (company/quick_upload.html). A file input accepts a dropped file natively, so the drop zone is only styling. */
+.company-dropzone {
+  display: block;
+  width: 100%;
+  padding: 2rem 1rem;
+  border: 2px dashed var(--color-dd-primary-300);
+  border-radius: 0.5rem;
+  background: var(--color-dd-primary-50);
+  cursor: pointer;
+}
+.company-dropzone:hover,
+.company-dropzone:focus {
+  border-color: var(--color-dd-primary-600);
+}
+.company-upload-new-component {
+  margin-top: 0.5rem;
+}
+.company-more-options {
+  margin: 0 0 1rem;
+}
+.company-more-options > summary {
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+.company-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Action links under the tab bar (company/_quick_actions.html). */
+.company-quick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}

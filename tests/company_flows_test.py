@@ -4,11 +4,15 @@ company: browser smoke test of the company UI layer, run by the test-company-ui 
 Starts as a smoke test and grows with each phase of the easier-UI plan. Runs as admin, like the
 upstream suite; BaseTestCase.tearDown fails the test on any SEVERE browser console error.
 """
+import os
 import sys
 import unittest
+from pathlib import Path
 
 from base_test_class import BaseTestCase, on_exception_html_source_logger
+from product_test import ProductTest
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select, WebDriverWait
 
 
 class CompanyFlowsTest(BaseTestCase):
@@ -21,11 +25,41 @@ class CompanyFlowsTest(BaseTestCase):
         self.assertTrue(driver.current_url.rstrip("/").endswith("/dashboard"))
         self.assertTrue(self.is_text_present_on_page(text="Active Engagements"))
 
+    @on_exception_html_source_logger
+    def test_quick_upload(self):
+        # Phase 2: "Upload scan" in the sidebar, then "Upload new report" on the test page re-imports into the same test
+        driver = self.driver
+        report = str(Path(os.path.realpath(__file__)).parent / "zap_sample.xml")
+        driver.get(self.base_url + "dashboard")
+        driver.find_element(By.CSS_SELECTOR, '#dd-sidebar a[data-testid="company-nav-upload"]').click()
+        # choosing the product, then the scanner, re-renders the page with them in the query string. The
+        # product is pre-selected when it is admin's only one (CI); Select would not click it again, so no reload.
+        product = Select(driver.find_element(By.ID, "id_product"))
+        if product.first_selected_option.text != "QA Test":
+            product.select_by_visible_text("QA Test")
+            WebDriverWait(driver, 10).until(lambda d: "product=" in d.current_url)
+        Select(driver.find_element(By.ID, "id_scan_type")).select_by_value("ZAP Scan")
+        WebDriverWait(driver, 10).until(lambda d: "scan_type=" in d.current_url)
+        driver.find_element(By.ID, "id_file").send_keys(report)
+        driver.find_element(By.CSS_SELECTOR, 'button[data-testid="company-upload-submit"]').click()
+        self.assertTrue(self.is_success_message_present(text="Upload complete: 4 new"))
+        test_url = driver.current_url
+        self.assertIn("/test/", test_url)
+
+        driver.find_element(By.CSS_SELECTOR, 'a[data-testid="company-upload-new-report"]').click()
+        driver.find_element(By.ID, "id_file").send_keys(report)
+        driver.find_element(By.CSS_SELECTOR, 'button[data-testid="company-upload-submit"]').click()
+        self.assertTrue(self.is_success_message_present(text="0 new, 0 closed, 0 reactivated, 4 unchanged"))
+        self.assertEqual(driver.current_url, test_url)
+
 
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(BaseTestCase("test_login"))
     suite.addTest(CompanyFlowsTest("test_my_work_shortcut"))
+    suite.addTest(ProductTest("test_create_product"))
+    suite.addTest(CompanyFlowsTest("test_quick_upload"))
+    suite.addTest(ProductTest("test_delete_product"))
     return suite
 
 

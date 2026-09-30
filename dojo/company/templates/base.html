@@ -3,8 +3,9 @@
 {% load i18n %}
 {% load display_tags %}
 {# company: extends upstream dojo/templates/base.html through recursive template loading and overrides only blocks that no #}
-{# upstream leaf template overrides: header_logo, sidebar-items (company shortcuts, then upstream's items), support-tab, #}
-{# dojo_css (company stylesheet, palette, non-staff declutter) and footer. Everything else renders from the upstream file. #}
+{# upstream leaf template overrides: header_logo, sidebar-items (company shortcuts, then upstream's items), tab_bar #}
+{# (upstream's tabs, then company action links), support-tab, dojo_css (company stylesheet, palette, non-staff declutter) #}
+{# and footer. Everything else renders from the upstream file. #}
 
 {% block header_logo %}
     <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0">
@@ -16,6 +17,11 @@
 {% block sidebar-items %}
     {% include "company/_sidebar.html" %}
     {{ block.super }}
+{% endblock %}
+
+{% block tab_bar %}
+    {{ block.super }}
+    {% include "company/_quick_actions.html" %}
 {% endblock %}
 
 {% block support-tab %}{% endblock %}

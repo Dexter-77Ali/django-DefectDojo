@@ -1,0 +1,29 @@
+{% load i18n %}
+{% load authorization_tags %}
+{# company: action links under upstream's tab bar, included from block tab_bar in company base.html after block.super. #}
+{# Links only, "btn btn-success btn-sm", never <button> or btn-primary, never an upstream link text: upstream selenium #}
+{# clicks the nth btn-primary and finds links by text. Shown only with import permission on the object. #}
+{% url 'company_quick_upload' as company_upload_url %}
+{% if company_upload_url %}
+    {% with page=request.resolver_match.url_name %}
+        {% if page == "view_test" and test %}
+            {# show_re_upload: upstream's view_test flag for tests whose type is an active parser (manual tests are not) #}
+            {% if show_re_upload and test|has_object_permission:"import" %}
+                <div class="company-quick-actions">
+                    <a class="btn btn-success btn-sm" href="{{ company_upload_url }}?test={{ test.id }}" data-testid="company-upload-new-report">
+                        <i class="fa-solid fa-upload"></i> {% trans "Upload new report" %}
+                    </a>
+                </div>
+            {% endif %}
+        {% elif page == "view_product" or page == "product_open_findings" or page == "view_engagements" or page == "view_engagement" %}
+            {# product overview, findings, engagements: not upstream's import, re-import, edit or delete pages #}
+            {% if product_tab.product and product_tab.product|has_object_permission:"import" %}
+                <div class="company-quick-actions">
+                    <a class="btn btn-success btn-sm" href="{{ company_upload_url }}?product={{ product_tab.product.id }}" data-testid="company-upload-report">
+                        <i class="fa-solid fa-upload"></i> {% trans "Upload report" %}
+                    </a>
+                </div>
+            {% endif %}
+        {% endif %}
+    {% endwith %}
+{% endif %}

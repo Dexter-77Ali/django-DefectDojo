@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load i18n %}
+{# company: one-page scan upload (dojo.company.views.quick_upload). Only classes from tailwind-out.css and company.css. #}
+{% block content %}
+    {{ block.super }}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="no-margin-top">
+                {% if test %}
+                    {% blocktrans with test_name=test %}Upload a new report for {{ test_name }}{% endblocktrans %}
+                {% else %}
+                    {% trans "Upload scan" %}
+                {% endif %}
+            </h3>
+        </div>
+        <div class="panel-body">
+            {% if not has_products %}
+                <div class="alert alert-info" role="alert">
+                    {% trans "You cannot upload to any product yet. Ask your security team to add you to your product." %}
+                </div>
+            {% endif %}
+            <form method="post" enctype="multipart/form-data" x-data="{ busy: false }" @submit="busy = true" @pageshow.window="busy = false">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">{{ form.non_field_errors|join:" " }}</div>
+                {% endif %}
+                {% if test %}
+                    <p class="help-block">
+                        {% blocktrans with scanner=test.scan_type|default:test.test_type.name %}Scanner: {{ scanner }}. The findings of this test are updated with the new report.{% endblocktrans %}
+                    </p>
+                {% else %}
+                    {% include "company/_upload_field.html" with field=form.product %}
+                    {% include "company/_upload_field.html" with field=form.scan_type %}
+                {% endif %}
+                {% include "company/_upload_field.html" with field=form.file %}
+                {% if not test and form.component_required %}
+                    <div class="form-group{% if form.component.errors %} has-error{% endif %}" x-data="{ pick: '{{ component_pick|escapejs }}' }">
+                        <label class="control-label" for="company-component-pick">{{ form.component.label }}<sup>*</sup></label>
+                        <select id="company-component-pick" class="form-control" x-model="pick"
+                                @change="$refs.component.value = pick === '__new__' ? '' : pick">
+                            <option value="">{% trans "Choose a component…" %}</option>
+                            {% if form.untitled_test %}
+                                <option value="{{ no_component }}">{% trans "No component" %}</option>
+                            {% endif %}
+                            {% for title in form.component_titles %}
+                                <option value="{{ title }}">{{ title }}</option>
+                            {% endfor %}
+                            <option value="__new__">{% trans "New component…" %}</option>
+                        </select>
+                        <input type="text" name="{{ form.component.html_name }}" id="{{ form.component.id_for_label }}" maxlength="255"
+                               class="form-control company-upload-new-component" value="{{ form.component.value|default_if_none:'' }}"
+                               placeholder="{% trans 'Name of the new component' %}" x-ref="component" x-show="pick === '__new__'">
+                        {% for error in form.component.errors %}<p class="help-block">{{ error }}</p>{% endfor %}
+                        <p class="help-block" id="{{ form.component.auto_id }}_helptext">{{ form.component.help_text }}</p>
+                    </div>
+                {% endif %}
+                <details class="company-more-options"{% if form.close_old_findings.errors or form.component.errors and not form.component_required %} open{% endif %}>
+                    <summary>{% trans "More options" %}</summary>
+                    {% if not test and not form.component_required %}
+                        {% include "company/_upload_field.html" with field=form.component %}
+                    {% endif %}
+                    <div class="form-group">
+                        <div class="checkbox">
+                            <label>{{ form.close_old_findings }} {{ form.close_old_findings.label }}</label>
+                        </div>
+                        <p class="help-block" id="{{ form.close_old_findings.auto_id }}_helptext">{{ form.close_old_findings.help_text }}</p>
+                    </div>
+                </details>
+                <div class="form-group company-upload-actions">
+                    <button type="submit" class="btn btn-primary" data-testid="company-upload-submit" :disabled="busy">
+                        <i class="fa-solid fa-upload"></i>
+                        <span x-show="!busy">{% trans "Upload" %}</span>
+                        <span x-show="busy" x-cloak>{% trans "Uploading…" %}</span>
+                    </button>
+                    {% if all_options_url %}
+                        <a href="{{ all_options_url }}">{% trans "All options…" %}</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
