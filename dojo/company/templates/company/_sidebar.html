@@ -1,0 +1,21 @@
+{% load i18n %}
+{# company: shortcuts at the top of the sidebar, included from block sidebar-items in company base.html before upstream's items. #}
+{# Every link resolves its URL with "url ... as": that never raises, so a link whose view is missing (not built yet, or renamed upstream) #}
+{# is left out instead of breaking every page. Markup and classes copy upstream's top-level sidebar links (dojo/templates/base.html). #}
+{# Labels never repeat an upstream link text (selenium finds links by text); for non-staff users company/_declutter.html hides #}
+{# upstream's own Dashboard link and Reports section, which these shortcuts replace. #}
+{% url 'dashboard' as company_my_work_url %}
+{% if company_my_work_url %}
+    <a href="{{ company_my_work_url }}" data-testid="company-nav-my-work" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        <i class="fa-solid fa-briefcase w-5 text-center flex-shrink-0"></i>
+        <span class="truncate">{% trans "My work" %}</span>
+    </a>
+{% endif %}
+{% url 'report_builder' as company_reports_url %}
+{% if company_reports_url %}
+    <a href="{{ company_reports_url }}" data-testid="company-nav-reports" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        <i class="fa-solid fa-file-lines w-5 text-center flex-shrink-0"></i>
+        <span class="truncate">{% trans "Build a report" %}</span>
+    </a>
+{% endif %}
+<div style="margin:.25rem 1rem; border-top:1px solid rgba(255,255,255,0.1);"></div>

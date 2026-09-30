@@ -30,6 +30,8 @@ x-company-env: &company-env
   DD_COMPANY_SLA_FACTORS: "${DD_COMPANY_SLA_FACTORS:-}"
   DD_COMPANY_ESCALATION_EMAILS: "${DD_COMPANY_ESCALATION_EMAILS:-}"
   DD_COMPANY_ESCALATION_EVENTS: "${DD_COMPANY_ESCALATION_EVENTS:-sla_breach,sla_breach_combined,risk_acceptance_expiration}"
+  # engagement shared by UI uploads and CI re-imports (engagement_name in the CI recipe, docker/company/README.md)
+  DD_COMPANY_UPLOAD_ENGAGEMENT_NAME: "${DD_COMPANY_UPLOAD_ENGAGEMENT_NAME:-Security scans}"
   DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
   # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
   DD_COMPANY_LDAP_PROFILE: "${DD_COMPANY_LDAP_PROFILE:-ad}"

@@ -2,14 +2,20 @@
 {% load static %}
 {% load i18n %}
 {% load display_tags %}
-{# company: extends upstream dojo/templates/base.html through recursive template loading and #}
-{# overrides four blocks only. Everything else renders from the upstream file. #}
+{# company: extends upstream dojo/templates/base.html through recursive template loading and overrides only blocks that no #}
+{# upstream leaf template overrides: header_logo, sidebar-items (company shortcuts, then upstream's items), support-tab, #}
+{# dojo_css (company stylesheet, palette, non-staff declutter) and footer. Everything else renders from the upstream file. #}
 
 {% block header_logo %}
     <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0">
         <img src="{% static 'dojo/company/icon.png' %}" alt="{{ COMPANY_NAME }}" class="w-8 h-8 flex-shrink-0">
         <span class="text-lg font-semibold text-white truncate">{{ COMPANY_NAME }}</span>
     </a>
+{% endblock %}
+
+{% block sidebar-items %}
+    {% include "company/_sidebar.html" %}
+    {{ block.super }}
 {% endblock %}
 
 {% block support-tab %}{% endblock %}
@@ -19,6 +25,9 @@
     <link rel="stylesheet" href="{% static 'dojo/company/company.css' %}?v={% static_v 'dojo/company/company.css' %}">
     {% if COMPANY_PALETTE %}
     <style id="company-palette">:root{ {% for shade, color in COMPANY_PALETTE.items %}--color-dd-primary-{{ shade }}:{{ color }};{% endfor %} }</style>
+    {% endif %}
+    {% if request.user.is_authenticated and not request.user.is_staff and not request.user.is_superuser %}
+        {% include "company/_declutter.html" %}
     {% endif %}
 {% endblock %}
 

@@ -74,11 +74,54 @@ variable no compose file passes on.
 | `DD_TIME_ZONE` | local time for UI dates and the daily SLA job (07:30), e.g. `Asia/Baghdad` | `UTC` |
 | `secrets/dd_email_url` | outgoing mail relay for notifications and escalation copies (production layer) | `smtp://localhost:25`, sends nothing |
 | `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, group prefix) | off |
+| `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` | engagement that UI uploads and CI re-imports share, so a fixed finding closes whichever way the next scan arrives | `Security scans` |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
 
 Logo files (`dojo/static/dojo/company/icon.png`, `logo.png`) and the upstream login logo and
 favicon are baked into the images; per-company artwork means building the images from a
 branch or tag that carries that company's files.
+
+## ZainCash setup (administrator checklist)
+
+Configuration only, done once by a superuser after the first deployment. Nothing here needs a
+build or a restart.
+
+1. **Turn off unused features.** Configuration > System Settings: untick *Enable Calendar*,
+   *Enable questionnaires*, *Enable Benchmarks*, *Enable checklists*, *Enable Product Tracking
+   Files* and *Enable Endpoint Metadata Import*. Each one removes menu entries.
+2. **Deduplication.** Same page: tick *Deduplicate findings*.
+3. **Risk acceptance.** Same page: *Risk acceptance form default days* = `90` and
+   *Risk acceptance expiration heads up days* = `10`. Never leave the heads-up field empty: the
+   daily expiration job raises on an empty value (upstream `dojo/risk_acceptance/helper.py:295`).
+4. **No one-click acceptance.** Keep *Enable simple risk acceptance* unticked on every product
+   (product > Settings > Edit), so acceptance always goes through the risk acceptance form.
+5. **Notifications.** Open `/notifications/system` and set *Other* and *Review requested* to Mail.
+   Then open `/notifications/template` and set the same two rows there: every user created
+   later, directory users on their first login included, copies the template row
+   (`dojo/notifications/signals.py`).
+6. **CI uploads.** Create a local service user (for example `ci-scanner`) that is neither staff nor
+   superuser, and add it to each product type whose pipelines upload (the organization page >
+   *Authorized Users* > *Add Users*; the product type must already exist). Log in as that user
+   once and copy its key from the user menu > *API v2 Key* into the CI secret store. A pipeline then uploads with one
+   call; the product and the engagement are created on the first upload, later uploads re-import
+   into the same test and close the findings that disappeared:
+
+   ```bash
+   curl -fsS -X POST "https://<host>/api/v2/reimport-scan/" \
+     -H "Authorization: Token $DEFECTDOJO_API_KEY" \
+     -F auto_create_context=true \
+     -F product_type_name="<product type>" \
+     -F product_name="<product>" \
+     -F engagement_name="Security scans" \
+     -F test_title="<component>" \
+     -F scan_type="<scanner, e.g. ZAP Scan>" \
+     -F close_old_findings=true \
+     -F file=@<report file>
+   ```
+
+   `engagement_name` must equal `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` (default `Security scans`) so UI
+   uploads and CI share one history. `test_title` names the component (repository or service): each
+   component gets its own test, so one pipeline never closes another component's findings.
 
 ## LDAP against Active Directory
 

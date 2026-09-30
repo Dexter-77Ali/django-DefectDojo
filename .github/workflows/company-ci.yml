@@ -51,6 +51,84 @@ jobs:
     uses: ./.github/workflows/integration-tests.yml
     secrets: inherit
 
+  # Company UI smoke test (tests/company_flows_test.py). Upstream's integration-tests.yml has a fixed
+  # file matrix and no inputs, so its load, start, initialize and run steps are copied here for one stack.
+  test-company-ui:
+    needs: build-docker-containers
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_VERSION: debian
+      NGINX_VERSION: alpine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load images from artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: built-docker-image
+          pattern: built-docker-image-*
+          merge-multiple: true
+
+      - name: Load docker images
+        timeout-minutes: 10
+        run: |-
+             docker load -i built-docker-image/nginx-alpine-linux-amd64_img
+             docker load -i built-docker-image/django-debian-linux-amd64_img
+             docker load -i built-docker-image/integration-tests-debian-linux-amd64_img
+             docker images
+
+      - name: Set integration-test mode
+        run: ln -s docker-compose.override.integration_tests.yml docker-compose.override.yml
+
+      - name: Pull external images
+        run: |
+          for attempt in 1 2 3; do
+            if docker compose pull --quiet mailhog webhook.endpoint; then
+              exit 0
+            fi
+            echo "::warning::pull attempt ${attempt} failed; retrying in 15s"
+            sleep 15
+          done
+          echo "::error::could not pull mailhog / webhook.endpoint after 3 attempts"
+          exit 1
+
+      - name: Start Dojo
+        timeout-minutes: 10
+        run: |-
+             RETRY=0
+             until docker compose up --no-deps -d postgres nginx celerybeat celeryworker mailhog uwsgi valkey webhook.endpoint
+               do
+               if [[ $RETRY -gt 2 ]]; then
+                 echo "ERROR: could not start Dojo after $RETRY retries"
+                 exit 1
+               fi
+               RETRY=$((RETRY+1))
+               echo "Attempt $RETRY to start Dojo"
+               sleep 15
+             done
+
+      - name: Initialize
+        timeout-minutes: 10
+        run: docker compose up --no-deps --exit-code-from initializer initializer
+
+      - name: Company UI tests
+        timeout-minutes: 15
+        run: docker compose up --no-deps --exit-code-from integration-tests integration-tests
+        env:
+          DD_INTEGRATION_TEST_FILENAME: tests/company_flows_test.py
+          INTEGRATION_TESTS_VERSION: debian
+
+      - name: Logs
+        if: always()
+        run: docker compose logs --tail="2500"
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down
+
   # every company profile must apply, and every variable it sets must reach the containers
   profiles:
     runs-on: ubuntu-latest
@@ -64,7 +142,7 @@ jobs:
 
   company-ci-complete:
     if: always()
-    needs: [ ruff, profiles, build-docker-containers, test-rest-framework, test-user-interface ]
+    needs: [ ruff, profiles, build-docker-containers, test-rest-framework, test-user-interface, test-company-ui ]
     runs-on: ubuntu-latest
     steps:
       - name: Fail when any job failed, was cancelled or skipped

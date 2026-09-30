@@ -5,7 +5,7 @@ Covers the mechanism, not the artwork: the company app is installed through
 dojo/settings/local_settings.py, its template directory is searched first,
 the company base.html overrides the sidebar logo, the support tab, the
 stylesheet include and the footer, and the context-processor wrapper hides
-the Pro upsell link. Runs inside the uwsgi container like every other test:
+the Pro upsell link and the "Get Pro" banners. Runs inside the uwsgi container like every other test:
     bash ./run-unittest.sh -t unittests.company.test_branding
 """
 
@@ -16,6 +16,7 @@ from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
 from dojo.company.context_processors import globalize_vars
+from dojo.product_announcements import ErrorPageProductAnnouncement, LongRunningRequestProductAnnouncement
 from unittests.dojo_test_case import DojoTestCase, versioned_fixtures
 
 
@@ -48,6 +49,24 @@ class TestCompanyContextProcessor(DojoTestCase):
         self.assertEqual(context["COMPANY_NAME"], "Acme")
         # upstream values still flow through the wrapper
         self.assertIn("CLASSIC_AUTH_ENABLED", context)
+
+    @override_settings(OS_MESSAGE_ENABLED=False)
+    def test_drops_pro_upsell_banners_and_keeps_the_others(self):
+        request = RequestFactory().get("/")
+        request.session = {}
+        ErrorPageProductAnnouncement(request=request)  # what upstream queues after an error page
+        request.session["_product_banners"].append({"source": "company-test", "message": "Maintenance tonight"})
+        context = globalize_vars(request)
+        self.assertEqual([b["message"] for b in context["additional_banners"]], ["Maintenance tonight"])
+        self.assertNotIn("_product_banners", request.session)  # consumed, not left for the next page
+
+    @override_settings(OS_MESSAGE_ENABLED=False)
+    def test_no_banner_area_when_only_upsell_was_queued(self):
+        request = RequestFactory().get("/")
+        request.session = {}
+        LongRunningRequestProductAnnouncement(request=request, duration=60)
+        self.assertEqual(len(request.session["_product_banners"]), 1)
+        self.assertNotIn("additional_banners", globalize_vars(request))
 
 
 @versioned_fixtures
