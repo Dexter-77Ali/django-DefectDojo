@@ -8,11 +8,12 @@ PRODUCT_ANNOUNCEMENT_SOURCE = "product_announcement"
 
 
 def globalize_vars(request):
-    """Upstream context plus the company name and palette, minus the Pro upsell link (SHOW_PLG_LINK) and banners."""
+    """Upstream context plus the company name, palette and Mark fixed switch, minus the Pro upsell link (SHOW_PLG_LINK) and banners."""
     context = _upstream_globalize_vars(request)
     context["SHOW_PLG_LINK"] = False
     context["COMPANY_NAME"] = settings.COMPANY_NAME
     context["COMPANY_PALETTE"] = getattr(settings, "COMPANY_PALETTE", None) or {}
+    context["COMPANY_MARK_FIXED"] = settings.COMPANY_MARK_FIXED
     # Upstream has already popped the session queue; keep every banner that is not an upsell.
     banners = [
         banner for banner in context.pop("additional_banners", [])

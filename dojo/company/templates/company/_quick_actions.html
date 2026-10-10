@@ -46,6 +46,17 @@
                     </button>
                 {% endif %}
             </form>
+            {% url 'company_mark_fixed' finding.id as company_mark_fixed_url %}
+            {% if COMPANY_MARK_FIXED and finding.active and company_mark_fixed_url %}
+                {# one POST to upstream's close_finding; with mandatory note types the view sends the user to upstream's close page #}
+                <form method="post" action="{{ company_mark_fixed_url }}" class="company-quick-actions" data-testid="company-mark-fixed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-default btn-sm" data-testid="company-mark-fixed">
+                        <i class="fa-solid fa-circle-check"></i> {% trans "Mark fixed" %}
+                    </button>
+                </form>
+            {% endif %}
             {% url 'company_risk_request' as company_risk_request_url %}
             {% if company_risk_request_url %}
                 {# open, not accepted findings of products with full risk acceptance on; a waiting request shows instead #}

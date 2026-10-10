@@ -24,14 +24,29 @@ from dojo.authorization.authorization import user_has_configuration_permission
 from dojo.authorization.middleware import AuthorizationMiddleware
 from dojo.authorization.url_permissions import URL_PERMISSIONS
 from dojo.filters import DojoFilter, FindingSLAFilter, FindingTagFilter
+from dojo.finding import helper as finding_helper
 from dojo.finding.helper import OPEN_FINDINGS_QUERY
 from dojo.finding.queries import get_authorized_findings_for_queryset
+from dojo.finding.ui import views as finding_ui_views
 from dojo.finding.ui.filters import FindingFilter
+from dojo.finding.ui.views import get_missing_mandatory_notetypes
 from dojo.importers.auto_create_context import AutoCreateContextManager
 from dojo.importers.options import ImporterOptions
 from dojo.importers.services import ImportResult, auto_import_scan
 from dojo.jira import services as jira_services
-from dojo.models import Dojo_User, Engagement, Finding, JIRA_Project, Notes, Product, Risk_Acceptance, Test, Test_Type
+from dojo.middleware import LanguagePreferenceMiddleware, set_language_cookie
+from dojo.models import (
+    Dojo_User,
+    Engagement,
+    Finding,
+    JIRA_Project,
+    Notes,
+    Product,
+    Risk_Acceptance,
+    Test,
+    Test_Type,
+    UserContactInfo,
+)
 from dojo.notifications.helper import NotificationManager, create_notification
 from dojo.risk_acceptance import helper as ra_helper
 from dojo.risk_acceptance.api.serializer import RiskAcceptanceSerializer
@@ -88,14 +103,14 @@ URL_NAMES = {
     "reinstate_risk_acceptance": (1, 1),
     "delete_risk_acceptance": (1, 1),
     "simple_risk_accept_finding": (1,),
-    # Phase 5 "Mark fixed" falls back to the upstream close page
+    # Phase 5 "Mark fixed" falls back to the upstream close page; the EN / Arabic switch returns to the dashboard
     "close_finding": (1,),
 }
 
-# Blocks of upstream dojo/templates/base.html that company/base.html overrides now (header_logo,
-# sidebar-items, support-tab, dojo_css, footer, tab_bar: upload, assign and risk request actions, modals: the bulk
-# "Assign…" and "Request risk acceptance…" forms, extra_javascript: company.js) or a later phase will
-# (settings-dropdown-items: language switch).
+# Blocks of upstream dojo/templates/base.html that company/base.html overrides (header_logo, sidebar-items,
+# support-tab, dojo_css, footer, tab_bar: upload, assign, Mark fixed and risk request actions, modals: the bulk
+# "Assign…", "Request risk acceptance…" and "Mark fixed…" forms, extra_javascript: company.js,
+# settings-dropdown-items: the EN / Arabic switch).
 BASE_BLOCKS = {
     "header_logo", "sidebar-items", "support-tab", "dojo_css", "footer",
     "tab_bar", "modals", "extra_javascript", "settings-dropdown-items",
@@ -150,7 +165,7 @@ class TestUpstreamContract(DojoTestCase):
             "add_findings_to_risk_acceptance": {"user", "risk_acceptance", "findings"},
             "note_on_risk_acceptance": {"risk_acceptance", "user", "action", "reason"},
             "reinstate": {"risk_acceptance", "old_expiration_date", "user"},
-            "expire_now": {"risk_acceptance", "user"},
+            "expire_now": {"risk_acceptance", "user", "reason"},
             "default_expiration_date": set(),
             "expiration_days": set(),
             "get_view_risk_acceptance": {"risk_acceptance"},
@@ -160,6 +175,41 @@ class TestUpstreamContract(DojoTestCase):
             with self.subTest(name=name):
                 function = getattr(ra_helper, name)
                 self.assertLessEqual(parameters, set(inspect.signature(function).parameters))
+        # Phase 5 Extend writes its own note because reinstate notes only expired acceptances, and relies on reinstate
+        # clearing the expiration warning in every case, so the heads-up goes out again before the new date
+        reinstate = inspect.getsource(inspect.unwrap(ra_helper.reinstate))
+        handled, noted = reinstate.index("if risk_acceptance.expiration_date_handled:"), reinstate.index("note_on_risk_acceptance(")
+        cleared = reinstate.index("risk_acceptance.expiration_date_warned = None")
+        self.assertLess(handled, noted)
+        self.assertLess(noted, cleared)
+        self.assertNotIn("        risk_acceptance.expiration_date_warned = None", reinstate)  # function level, outside the if
+
+    def test_mark_fixed_building_blocks(self):
+        # Phase 5 "Mark fixed": upstream's close helper with these keywords, the mandatory note check of its close page
+        self.assertLessEqual(
+            {"finding", "user", "is_mitigated", "mitigated", "mitigated_by", "false_p", "out_of_scope", "duplicate", "note_entry"},
+            set(inspect.signature(finding_helper.close_finding).parameters),
+        )
+        close = inspect.getsource(finding_helper.close_finding)
+        self.assertIn("finding.mitigated_by = mitigated_by or user", close)
+        self.assertIn("normalize_datetime(mitigated) or current_time", close)
+        self.assertEqual(list(inspect.signature(get_missing_mandatory_notetypes).parameters), ["finding"])
+        self.assertIn("is_mandatory=True, is_active=True", inspect.getsource(get_missing_mandatory_notetypes))
+        self.assertIn("get_missing_mandatory_notetypes(finding)", inspect.getsource(finding_ui_views.close_finding))
+
+    def test_language_switch_building_blocks(self):
+        # Phase 5 EN / Arabic switch: the cookie helper and the stored preference upstream's middleware reads
+        self.assertEqual(list(inspect.signature(set_language_cookie).parameters), ["response", "language"])
+        middleware = inspect.getsource(LanguagePreferenceMiddleware.__call__)
+        self.assertIn('getattr(user, "usercontactinfo", None)', middleware)
+        self.assertIn('getattr(contact, "language", "")', middleware)
+        self.assertIn("dojo.middleware.LanguagePreferenceMiddleware", settings.MIDDLEWARE)
+        self.assertIn("language", {field.name for field in UserContactInfo._meta.get_fields()})
+        self.assertIn("ar", dict(settings.LANGUAGES))
+        # company catalogs first: local_settings.py inserts into upstream's list (a tuple would make it raise)
+        self.assertIsInstance(settings.LOCALE_PATHS, list)
+        self.assertEqual(Path(settings.LOCALE_PATHS[0]), Path(dojo.__file__).parent / "company" / "locale")
+        self.assertIn(Path(dojo.__file__).parent / "locale", [Path(path) for path in settings.LOCALE_PATHS])
 
     def test_risk_acceptance_enforcement_hooks(self):
         # Phase 4 enforcement (dojo/company/signals.py) wraps these helpers in ra_helper; the wrapper reaches only

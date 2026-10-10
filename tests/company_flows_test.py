@@ -103,6 +103,21 @@ class CompanyFlowsTest(BaseTestCase):
         row = driver.find_element(By.CSS_SELECTOR, '[data-testid^="company-risk-mine-"]')
         self.assertIn("Waiting for approval", row.text)
 
+    @on_exception_html_source_logger
+    def test_mark_fixed(self):
+        # Phase 5: "Mark fixed" on a finding page closes it in one click and returns to the page; the open list drops it.
+        # The newest open finding: the risk acceptance test above left a request on the oldest one.
+        driver = self.driver
+        driver.get(self.base_url + "finding/open")
+        finding_id = max(self.listed_finding_ids(), key=int)
+        driver.get(self.base_url + f"finding/{finding_id}")
+        driver.find_element(By.CSS_SELECTOR, 'button[data-testid="company-mark-fixed"]').click()
+        self.assertTrue(self.is_success_message_present(text="Marked 1 finding fixed."))
+        self.assertTrue(driver.current_url.rstrip("/").endswith(f"/finding/{finding_id}"))
+        self.assertFalse(driver.find_elements(By.CSS_SELECTOR, 'button[data-testid="company-mark-fixed"]'))
+        driver.get(self.base_url + "finding/open")
+        self.assertNotIn(finding_id, self.listed_finding_ids())
+
 
 def suite():
     suite = unittest.TestSuite()
@@ -112,6 +127,7 @@ def suite():
     suite.addTest(CompanyFlowsTest("test_quick_upload"))
     suite.addTest(CompanyFlowsTest("test_bulk_assign"))
     suite.addTest(CompanyFlowsTest("test_request_risk_acceptance"))
+    suite.addTest(CompanyFlowsTest("test_mark_fixed"))
     suite.addTest(ProductTest("test_delete_product"))
     return suite
 

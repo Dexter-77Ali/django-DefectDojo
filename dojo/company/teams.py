@@ -10,11 +10,12 @@ team:<name>, synced from the directory (dojo.company.ldap.sync_team_membership) 
 from urllib.parse import urlencode
 
 import pghistory
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 from django_tagulous.utils import render_tags
@@ -30,6 +31,14 @@ from dojo.tags.utils import bulk_add_tags_to_instances, bulk_remove_tags_from_in
 ASSIGNEE = "assignee:"
 EVENT = "company_finding_assigned"  # in NOTIFICATIONS_SYSTEM_LEVEL_TRUMP (local_settings.py)
 MAX_FINDINGS = 500
+
+
+def instance_language():
+    """
+    Notes and notifications other people read are written in the instance language (LANGUAGE_CODE), never in the
+    language of the user who triggers them: upstream keeps stored values in English whatever the UI language.
+    """
+    return translation.override(settings.LANGUAGE_CODE)
 
 
 def assignee_tag(user) -> str:
@@ -101,10 +110,11 @@ def assign(findings, team: str, person, by) -> None:
     stale = {tag.name for finding in findings for tag in finding.tags.all() if tag.name.startswith((TEAM, ASSIGNEE))}
     stale -= set(wanted)
     who = Dojo_User.generate_full_name(by)
-    if person:
-        entry = _("Assigned to %(team)s / %(person)s by %(user)s") % {"team": team, "person": person, "user": who}
-    else:
-        entry = _("Assigned to %(team)s by %(user)s") % {"team": team, "user": who}
+    with instance_language():
+        if person:
+            entry = _("Assigned to %(team)s / %(person)s by %(user)s") % {"team": team, "person": person, "user": who}
+        else:
+            entry = _("Assigned to %(team)s by %(user)s") % {"team": team, "user": who}
     with transaction.atomic(), pghistory.context(source="company_assign"):
         if stale:
             bulk_remove_tags_from_instances(sorted(stale), findings)
@@ -132,10 +142,11 @@ def notify(count: int, team: str, person, members, by) -> None:
     recipients = [user.username for user in ([person] if person else members) if user.pk != by.pk]
     if not recipients:
         return
-    target = str(person) if person else _("team %(team)s") % {"team": team}
     who = Dojo_User.generate_full_name(by)
-    title = ngettext("%(user)s assigned %(count)d finding to %(target)s", "%(user)s assigned %(count)d findings to %(target)s", count)
-    title %= {"user": who, "count": count, "target": target}
+    with instance_language():
+        target = str(person) if person else _("team %(team)s") % {"team": team}
+        title = ngettext("%(user)s assigned %(count)d finding to %(target)s", "%(user)s assigned %(count)d findings to %(target)s", count)
+        title %= {"user": who, "count": count, "target": target}
     create_notification(
         event=EVENT,
         title=title,

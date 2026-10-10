@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% load i18n %}
-{# company: risk acceptance requests and acceptances (dojo.company.views.risk_inbox). Decisions post to company_risk_decide. #}
-{# Only classes from tailwind-out.css and company.css; rows open with native details elements, no script. #}
+{# company: risk acceptance requests and acceptances (dojo.company.views.risk_inbox). Decisions post to company_risk_decide, #}
+{# the Expiring tab's Extend and Let expire to company_risk_expiring. Only classes from tailwind-out.css and company.css; #}
+{# rows open with native details elements, no script beyond a confirm dialog. #}
 {% block content %}
     {{ block.super }}
     {% url 'company_risk_decide' as decide_url %}
@@ -110,9 +111,11 @@
                             <tr>
                                 <th>{% trans "Name" %}</th><th>{% trans "Product" %}</th><th>{% trans "Owner" %}</th>
                                 <th>{% trans "Accepted by" %}</th><th>{% trans "Findings" %}</th><th>{% trans "Expires" %}</th>
+                                {% if tab == "expiring" %}<th></th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
+                            {% url 'company_risk_expiring' as expiring_url %}
                             {% for acceptance in page %}
                                 <tr data-testid="company-risk-acceptance-{{ acceptance.id }}">
                                     <td>{% if acceptance.engagement %}<a href="{% url 'view_risk_acceptance' acceptance.engagement.id acceptance.id %}">{{ acceptance }}</a>{% else %}{{ acceptance }}{% endif %}</td>
@@ -121,6 +124,38 @@
                                     <td>{{ acceptance.accepted_by|default:"" }}</td>
                                     <td>{{ acceptance.finding_count }}</td>
                                     <td>{% if acceptance.expiration_date %}{{ acceptance.expiration_date|date }}{% else %}{% trans "Never" %}{% endif %}</td>
+                                    {% if tab == "expiring" %}
+                                        <td>
+                                            {# Extend: approvers, where the product allows full risk acceptance (company_risk_expiring checks again); #}
+                                            {# Let expire: whoever may edit the engagement #}
+                                            {% if expiring_url and acceptance.engagement.id in editable_engagements %}
+                                                {% if can_extend and acceptance.engagement.product.enable_full_risk_acceptance %}
+                                                    <form method="post" action="{{ expiring_url }}" class="company-risk-expiring">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="acceptance" value="{{ acceptance.id }}">
+                                                        <label class="sr-only" for="company-risk-days-{{ acceptance.id }}">{% trans "Extend by" %}</label>
+                                                        <select name="days" id="company-risk-days-{{ acceptance.id }}" class="form-control">
+                                                            {% for days in extend_days %}
+                                                                <option value="{{ days }}">{% blocktrans count counter=days %}{{ counter }} day{% plural %}{{ counter }} days{% endblocktrans %}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                        <button type="submit" name="action" value="extend" class="btn btn-default btn-sm" data-testid="company-risk-extend">
+                                                            <i class="fa-solid fa-calendar-plus"></i> {% trans "Extend" %}
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                                {% trans "Let this risk acceptance expire now? Its findings open again if it reactivates them." as expire_confirm %}
+                                                <form method="post" action="{{ expiring_url }}" class="company-risk-expiring"
+                                                      onsubmit="return window.confirm('{{ expire_confirm|escapejs }}');">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="acceptance" value="{{ acceptance.id }}">
+                                                    <button type="submit" name="action" value="expire" class="btn btn-default btn-sm" data-testid="company-risk-expire">
+                                                        <i class="fa-solid fa-hourglass-end"></i> {% trans "Let expire" %}
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
                                 </tr>
                             {% endfor %}
                         </tbody>

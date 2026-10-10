@@ -26,7 +26,7 @@ from django.utils.translation import ngettext
 
 import dojo.risk_acceptance.helper as ra_helper
 from dojo.company.models import RiskAcceptanceRequest
-from dojo.company.teams import add_notes, members_of_every_product
+from dojo.company.teams import add_notes, instance_language, members_of_every_product
 from dojo.finding.helper import NOT_ACCEPTED_FINDINGS_QUERY
 from dojo.finding.queries import get_authorized_findings
 from dojo.models import Dojo_User, Finding, Risk_Acceptance
@@ -110,14 +110,17 @@ def create(findings, requested_by, justification: str, days: int):
     with transaction.atomic():
         request = RiskAcceptanceRequest.objects.create(requested_by=requested_by, justification=justification, days=days)
         request.findings.add(*eligible)
-        add_notes(eligible, _("%(user)s requested risk acceptance for %(days)d days (request #%(id)d): %(justification)s") % {
-            "user": who, "days": days, "id": request.pk, "justification": justification}, requested_by)
+        with instance_language():
+            note = _("%(user)s requested risk acceptance for %(days)d days (request #%(id)d): %(justification)s") % {
+                "user": who, "days": days, "id": request.pk, "justification": justification}
+        add_notes(eligible, note, requested_by)
     recipients = [user.username for user in approvers_for(eligible) if user.pk != requested_by.pk]
-    title = ngettext(
-        "%(user)s requests risk acceptance of %(count)d finding for %(days)d days",
-        "%(user)s requests risk acceptance of %(count)d findings for %(days)d days",
-        len(eligible),
-    ) % {"user": who, "count": len(eligible), "days": days}
+    with instance_language():
+        title = ngettext(
+            "%(user)s requests risk acceptance of %(count)d finding for %(days)d days",
+            "%(user)s requests risk acceptance of %(count)d findings for %(days)d days",
+            len(eligible),
+        ) % {"user": who, "count": len(eligible), "days": days}
     # with no approver to notify the escalation copy (CompanyNotificationManager) still goes out
     create_notification(
         event=EVENT_REQUESTED,
@@ -170,13 +173,15 @@ def approve(request, approver, note: str = ""):
     if not _decide(request, RiskAcceptanceRequest.APPROVED, approver, note):
         return None
     try:
-        created = _accept(request, approver, note)
+        with instance_language():  # risk acceptance names and notes
+            created = _accept(request, approver, note)
     except Exception:
         request.risk_acceptances.filter(accepted_findings__isnull=True).delete()
         RiskAcceptanceRequest.objects.filter(pk=request.pk).update(status=PENDING, decided_by=None, decided_at=None, decision_note="")
         raise
     who = Dojo_User.generate_full_name(approver)
-    title = _("%(user)s approved your risk acceptance request #%(id)d") % {"user": who, "id": request.pk}
+    with instance_language():
+        title = _("%(user)s approved your risk acceptance request #%(id)d") % {"user": who, "id": request.pk}
     url = ra_helper.get_view_risk_acceptance(created[0]) if created else None
     _notify_requester(request, title, url)
     return created
@@ -223,10 +228,11 @@ def reject(request, approver, reason: str) -> bool:
     if not _decide(request, RiskAcceptanceRequest.REJECTED, approver, reason):
         return False
     who = Dojo_User.generate_full_name(approver)
-    add_notes(list(request.findings.all()), _("%(user)s rejected risk acceptance request #%(id)d: %(reason)s") % {
-        "user": who, "id": request.pk, "reason": reason}, approver)
-    _notify_requester(request, _("%(user)s rejected your risk acceptance request #%(id)d: %(reason)s") % {
-        "user": who, "id": request.pk, "reason": reason}, None)
+    with instance_language():
+        note = _("%(user)s rejected risk acceptance request #%(id)d: %(reason)s") % {"user": who, "id": request.pk, "reason": reason}
+        title = _("%(user)s rejected your risk acceptance request #%(id)d: %(reason)s") % {"user": who, "id": request.pk, "reason": reason}
+    add_notes(list(request.findings.all()), note, approver)
+    _notify_requester(request, title, None)
     return True
 
 
@@ -236,9 +242,27 @@ def cancel(request, user) -> bool:
         raise PermissionDenied
     if not _decide(request, RiskAcceptanceRequest.CANCELLED, user, ""):
         return False
-    add_notes(list(request.findings.all()), _("%(user)s cancelled risk acceptance request #%(id)d") % {
-        "user": Dojo_User.generate_full_name(user), "id": request.pk}, user)
+    with instance_language():
+        note = _("%(user)s cancelled risk acceptance request #%(id)d") % {"user": Dojo_User.generate_full_name(user), "id": request.pk}
+    add_notes(list(request.findings.all()), note, user)
     return True
+
+
+def extend(risk_acceptance, days: int, user) -> None:
+    """
+    Expiring tab "Extend": the expiry moves `days` later than the later of the current expiry and now. Saved through
+    upstream's reinstate, which also clears the expiration warning so the heads-up goes out again before the new
+    date, then noted here: reinstate notes only expired acceptances. Approvers only (the view checks, and with
+    DD_COMPANY_RA_APPROVAL_REQUIRED on the pre_save guard refuses everyone else).
+    """
+    old = risk_acceptance.expiration_date
+    now = timezone.now()
+    risk_acceptance.expiration_date = max(old or now, now) + timedelta(days=days)
+    ra_helper.reinstate(risk_acceptance, old, user=user)
+    with instance_language():
+        reason = ngettext("by %(days)d day, until %(date)s", "by %(days)d days, until %(date)s", days) % {
+            "days": days, "date": timezone.localdate(risk_acceptance.expiration_date).isoformat()}
+    ra_helper.note_on_risk_acceptance(risk_acceptance, user, "extended", reason=reason)
 
 
 def _notify_requester(request, title: str, url) -> None:

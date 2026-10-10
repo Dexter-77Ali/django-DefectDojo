@@ -37,6 +37,8 @@ x-company-env: &company-env
   # risk acceptance: durations a request can ask for (days), and whether only approvers (the security team) accept risk
   DD_COMPANY_RA_DAYS: "${DD_COMPANY_RA_DAYS:-30,90,180}"
   DD_COMPANY_RA_APPROVAL_REQUIRED: "${DD_COMPANY_RA_APPROVAL_REQUIRED:-False}"
+  # "Mark fixed" on findings (one click closes them as mitigated); False where developers may not close findings
+  DD_COMPANY_MARK_FIXED: "${DD_COMPANY_MARK_FIXED:-True}"
   DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
   # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
   DD_COMPANY_LDAP_PROFILE: "${DD_COMPANY_LDAP_PROFILE:-ad}"

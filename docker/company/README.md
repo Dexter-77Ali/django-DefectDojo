@@ -12,7 +12,8 @@ this file is the operator's checklist.
 | `docker-compose.yml` | upstream stack, never edited |
 | `docker-compose.company.yml` | company image, `DD_COMPANY_*` variables with placeholder defaults, optional `ldap` test directory |
 | `docker-compose.production.yml` | release mode: file secrets, TLS on 443, restart policies, prefork worker |
-| `Dockerfile.company` + `requirements-company.txt` | company layer (LDAP libraries) on the upstream image |
+| `Dockerfile.company` + `requirements-company.txt` | company layer (LDAP libraries, compiled company translations) on the upstream image |
+| `dojo/company/locale/` | company translation catalogs (`.po`; see *Language*) |
 | `docker/company/secrets.example/` | template for `./secrets/` |
 | `docker/company/ldap/` | seed of the local test directory only |
 
@@ -77,7 +78,8 @@ variable no compose file passes on.
 | `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` | engagement that UI uploads and CI re-imports share, so a fixed finding closes whichever way the next scan arrives | `Security scans` |
 | `DD_COMPANY_SCAN_TYPES` | scanner allowlist, comma separated scan types, applied by `manage.py company_scan_types` (see *Scanner allowlist*) | empty: every scanner |
 | `DD_COMPANY_RA_APPROVAL_REQUIRED` | only approvers (the security team) accept risk; everyone else requests it (see *Risk acceptance*) | `False` (ZainCash: `True`) |
-| `DD_COMPANY_RA_DAYS` | durations a risk acceptance can be requested for, comma separated days | `30,90,180` |
+| `DD_COMPANY_RA_DAYS` | durations a risk acceptance can be requested for, and extended by, comma separated days | `30,90,180` |
+| `DD_COMPANY_MARK_FIXED` | *Mark fixed* on finding pages and in the findings bulk menu (see *Mark fixed*); `False` where developers may not close findings themselves | `True` |
 | `DD_COMPANY_LDAP_RISK_APPROVER_GROUP` | group DN of the security team, whose members approve risk acceptance requests | workstation: `cn=dojo-security,…`; empty = managed with `company_teams --approver` |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
 
@@ -226,6 +228,52 @@ their directory groups on every login, so add directory users to the directory g
 the system setting *Filter string matching* on, a *My team's findings* link for someone in several
 teams matches nothing (that filter takes a single tag); keep the setting off.
 
+## Mark fixed
+
+*Mark fixed* under the tabs of an open finding's page, or *Mark fixed…* in the bulk menu of a findings
+list or test page (tick findings first, then confirm), closes the findings as mitigated in one step:
+upstream's close with the note "Marked fixed", the user as *Mitigated by*, now as the mitigation date,
+endpoint or location statuses, JIRA and the `finding_closed` notification included. It needs edit
+permission on every selected finding (otherwise 403 and nothing changes); findings closed already are
+skipped. When active note types are marked mandatory, a single finding goes to upstream's close page,
+which asks for those notes, and a bulk selection holding such a finding changes nothing. The assignment
+tags stay on the finding, so when a later upload reports it again and re-import reactivates it, it is
+back in the same person's *My findings*. `DD_COMPANY_MARK_FIXED=False` hides both buttons and refuses
+the action, for companies where developers may not close findings themselves (upstream's *Close
+Finding* stays, as permissions allow).
+
+## Language (English / Arabic)
+
+The user menu (top right) ends with *English* and *العربية*. A click saves the choice as the user's
+language (the *Language* field of the profile, `UserContactInfo.language`) and sets the language
+cookie, so the page reloads in that language; on another browser upstream's middleware picks the
+saved choice up at the next sign-in. The other languages stay available in the profile form.
+Upstream's own strings come from upstream's catalogs (`dojo/locale`); the company strings from
+`dojo/company/locale/ar/LC_MESSAGES/django.po`, searched first (`LOCALE_PATHS` in
+`local_settings.py`). Notes on findings and risk acceptances and notification texts are always written in
+the instance language (`DD_LANGUAGE_CODE`, English), whatever language the acting user has chosen,
+because other people read them.
+
+The catalog is a first draft that a native Arabic speaker should review before Arabic is announced.
+Only the `.po` file is in git (like upstream, `*.mo` is ignored); `Dockerfile.company` compiles it
+with `msgfmt --check` into the image. After adding or changing a company string:
+
+```bash
+# extract: new strings arrive empty, changed ones marked fuzzy (needs gettext and Django: a throwaway container)
+MSYS_NO_PATHCONV=1 docker run --rm -u root --entrypoint sh -v "$PWD:/app" -w /app/dojo/company \
+  defectdojo/defectdojo-django:latest-company -c 'apt-get update -qq && apt-get install -y -qq gettext && \
+  env -u DJANGO_SETTINGS_MODULE django-admin makemessages -l ar --add-location=file --no-obsolete -e html,py'
+# translate the empty and fuzzy entries in django.po (remove the fuzzy flag), then compile for the dev stack:
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD:/app" -w /app python:3.14-slim sh -c 'apt-get update -qq && \
+  apt-get install -y -qq gettext && msgfmt --check -o dojo/company/locale/ar/LC_MESSAGES/django.mo dojo/company/locale/ar/LC_MESSAGES/django.po'
+```
+
+The dev stack bind-mounts the source, so it uses this locally compiled `django.mo` (upstream's own
+catalogs are not compiled there, so upstream strings stay English in dev mode); restart uwsgi after
+compiling. `unittests/company/test_polish.py` checks that every entry is translated and uses only the
+placeholders of its English text. CI images are built from upstream's Dockerfiles without this step,
+so no test asserts Arabic text.
+
 ## Risk acceptance
 
 Members request, the security team approves. *Request risk acceptance* under the tabs of a finding
@@ -245,7 +293,14 @@ stay open; each gets a note, and the approvers who can open those products are n
   bulk. Nobody decides their own request, and an approver must be able to edit every finding of it.
 - *My requests*: status, decision, note and the risk acceptances an approval created; *Cancel request*
   while it waits.
-- *Active* and *Expiring in 30 days*: read-only lists of risk acceptances in the products the user can see.
+- *Active* and *Expiring in 30 days*: lists of risk acceptances in the products the user can see. In
+  *Expiring in 30 days*, whoever may edit the engagement can *Let expire* an acceptance now (upstream's
+  expire: its findings reopen when it reactivates them, and a note records who did it), and approvers
+  can *Extend* it by one of the `DD_COMPANY_RA_DAYS` durations, counted from its current expiry (or
+  from today when that has passed). Extending clears the expiry warning, so the heads-up goes out again
+  before the new date, and adds a note "… extended this risk acceptance (reason: by N days, until
+  <date>)". Both need edit permission on the engagement; with enforcement on, members still cannot
+  extend through any other path either.
 
 Approving creates one upstream risk acceptance per engagement: owner the requester, *Accepted by* the
 approver, decision *Accept*, the justification as decision details, expiring after the requested days

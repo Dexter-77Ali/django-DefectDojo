@@ -21,6 +21,10 @@ company_patterns = [
     re_path(r"^risk$", views.risk_inbox, name="company_risk_inbox"),
     re_path(r"^risk/request$", views.risk_request, name="company_risk_request"),
     re_path(r"^risk/decide$", views.risk_decide, name="company_risk_decide"),
+    re_path(r"^risk/expiring$", views.risk_expiring, name="company_risk_expiring"),
+    re_path(r"^finding/(?P<fid>\d+)/fixed$", views.mark_fixed, name="company_mark_fixed"),
+    re_path(r"^finding/fixed$", views.mark_fixed, name="company_mark_fixed_bulk"),
+    re_path(r"^language$", views.set_language, name="company_set_language"),
 ]
 
 urlpatterns = [

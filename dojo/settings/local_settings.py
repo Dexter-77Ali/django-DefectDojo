@@ -50,6 +50,14 @@ COMPANY_SCAN_TYPES = env.list("DD_COMPANY_SCAN_TYPES", default=[])  # noqa: F821
 COMPANY_RA_DAYS = [int(days) for days in env.list("DD_COMPANY_RA_DAYS", default=[]) if days.strip()] or [30, 90, 180]  # noqa: F821
 # Only approvers (the security team) accept risk; everyone else requests it (dojo/company/signals.py). Off in code.
 COMPANY_RA_APPROVAL_REQUIRED = env.bool("DD_COMPANY_RA_APPROVAL_REQUIRED", default=False)  # noqa: F821
+# "Mark fixed" on the finding page and in the findings bulk menu (dojo/company/views.py mark_fixed); False hides it
+# where developers may not close findings themselves.
+COMPANY_MARK_FIXED = env.bool("DD_COMPANY_MARK_FIXED", default=True)  # noqa: F821
+
+# --- translations ---------------------------------------------------------------
+# Company strings (dojo/company/locale/<lang>/LC_MESSAGES/django.po), searched before upstream's catalogs.
+# Only .po files are committed, as upstream does; Dockerfile.company compiles them into the image.
+LOCALE_PATHS.insert(0, root("dojo/company/locale"))  # noqa: F821
 
 # --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
 # Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here

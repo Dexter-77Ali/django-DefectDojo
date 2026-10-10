@@ -16,19 +16,25 @@ from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+import dojo.risk_acceptance.helper as ra_helper
 from dojo.authorization.authorization import user_has_permission_or_403
 from dojo.company import risk_requests, teams
 from dojo.company.forms import NO_COMPONENT, QuickUploadForm, RiskRequestForm, upload_engagement
 from dojo.company.models import RiskAcceptanceRequest
+from dojo.engagement.queries import get_authorized_engagements
+from dojo.finding import helper as finding_helper
 from dojo.finding.queries import get_authorized_findings_for_queryset
+from dojo.finding.ui.views import get_missing_mandatory_notetypes
 from dojo.importers.services import auto_import_scan
 from dojo.jira import services as jira_services
-from dojo.models import Finding, Product, Test
+from dojo.middleware import set_language_cookie
+from dojo.models import Finding, Note_Type, Product, Risk_Acceptance, Test, UserContactInfo
 from dojo.risk_acceptance.queries import get_authorized_risk_acceptances
 from dojo.utils import (
     Product_Tab,
@@ -279,6 +285,73 @@ def risk_request(request):
     })
 
 
+@login_required
+@require_POST
+def mark_fixed(request, fid=None):
+    """
+    Close findings as fixed in one click: from the finding page (fid) or the findings bulk menu (finding_to_update,
+    at most teams.MAX_FINDINGS), through upstream's close_finding with the note "Marked fixed". Every finding must
+    be editable by the user, otherwise 403 and nothing changes. Mandatory note types need upstream's close page,
+    which asks for them: a single finding goes there, a bulk selection holding such a finding changes nothing.
+    The assignment tags stay, so a re-upload that reactivates the finding keeps its assignee.
+    Off (controls hidden, view refused) with DD_COMPANY_MARK_FIXED=False.
+    """
+    if not settings.COMPANY_MARK_FIXED:
+        raise PermissionDenied
+    return_url = _return_url(request)
+    if return_url is None:
+        return HttpResponseBadRequest(_("return_url must stay on this site"))
+    raw_ids = [fid] if fid else request.POST.getlist("finding_to_update")
+    if not raw_ids or len(raw_ids) > teams.MAX_FINDINGS:
+        messages.warning(request, _("Select between 1 and %(max)d findings to mark fixed.") % {"max": teams.MAX_FINDINGS},
+                         extra_tags="alert-warning")
+        return redirect_to_return_url_or_else(request, reverse("open_findings"))
+    findings = [finding for finding in _editable_findings(request, raw_ids) if finding.active]
+    if not findings:
+        messages.info(request, _("The selected findings are closed already."), extra_tags="alert-info")
+        return redirect_to_return_url_or_else(request, reverse("open_findings"))
+    if Note_Type.objects.filter(is_mandatory=True, is_active=True).exists():
+        missing = [finding for finding in findings if get_missing_mandatory_notetypes(finding).exists()]
+        if len(findings) == 1 and missing:
+            return redirect("close_finding", findings[0].id)
+        if missing:
+            messages.warning(request, ngettext(
+                "%(count)d of the selected findings needs mandatory notes before it can be closed: close it from its page. Nothing was changed.",
+                "%(count)d of the selected findings need mandatory notes before they can be closed: close them from their pages. Nothing was changed.",
+                len(missing)) % {"count": len(missing)}, extra_tags="alert-warning")
+            return redirect_to_return_url_or_else(request, reverse("open_findings"))
+    with teams.instance_language():
+        note = _("Marked fixed")
+    with pghistory.context(source="company_mark_fixed"):
+        for finding in findings:
+            finding_helper.close_finding(
+                finding=finding, user=request.user, is_mitigated=True, mitigated=None, mitigated_by=None,
+                false_p=False, out_of_scope=False, duplicate=False, note_entry=note,
+            )
+    messages.success(request, ngettext("Marked %(count)d finding fixed.", "Marked %(count)d findings fixed.", len(findings)) % {
+        "count": len(findings)}, extra_tags="alert-success")
+    return redirect_to_return_url_or_else(request, reverse("open_findings"))
+
+
+@login_required
+@require_POST
+def set_language(request):
+    """
+    The EN / Arabic switch of the user menu: saves the user's language (UserContactInfo.language, read by upstream's
+    LanguagePreferenceMiddleware on other devices) and sets the cookie Django's LocaleMiddleware reads on this one.
+    """
+    return_url = _return_url(request)
+    if return_url is None:
+        return HttpResponseBadRequest(_("return_url must stay on this site"))
+    language = request.POST.get("language", "")
+    if language not in dict(settings.LANGUAGES):
+        return HttpResponseBadRequest(_("Unknown language"))
+    contact = UserContactInfo.objects.get_or_create(user=request.user)[0]
+    contact.language = language
+    contact.save(update_fields=["language"])
+    return set_language_cookie(redirect(return_url or "dashboard"), language)
+
+
 INBOX_TABS = ("waiting", "mine", "active", "expiring")
 EXPIRING_DAYS = 30
 
@@ -308,13 +381,64 @@ def risk_inbox(request):
         if tab == "expiring":
             items = items.filter(expiration_date__isnull=False, expiration_date__lte=timezone.now() + timedelta(days=EXPIRING_DAYS))
         items = items.order_by(F("expiration_date").asc(nulls_last=True), "id")
+    page = get_page_items(request, items, 25)
+    editable = set()
+    if tab == "expiring":
+        # "Let expire" for whoever may edit the engagement, "Extend" for approvers among them: one query for the page
+        engagement_ids = {engagement.id for acceptance in page for engagement in acceptance.engagement_set.all()}
+        editable = set(get_authorized_engagements("edit").filter(id__in=engagement_ids).values_list("id", flat=True))
     add_breadcrumb(title=_("Risk acceptance"), top_level=True, request=request)
     return render(request, "company/risk_inbox.html", {
         "tab": tab,
         "tabs": tabs,
-        "page": get_page_items(request, items, 25),
+        "page": page,
         "expiring_days": EXPIRING_DAYS,
+        "editable_engagements": editable,
+        "can_extend": tab == "expiring" and risk_requests.is_approver(user),
+        "extend_days": settings.COMPANY_RA_DAYS,
     })
+
+
+@login_required
+@require_POST
+def risk_expiring(request):
+    """
+    Expiring tab actions on one risk acceptance (acceptance=<id>): action=extend moves its expiry `days` (one of
+    DD_COMPANY_RA_DAYS) later, for approvers on a product with full risk acceptance on; action=expire lets it expire now (findings reopen when it reactivates
+    them), for anyone who may edit its engagement, like upstream's expire page. Both need edit on the engagement.
+    """
+    action = request.POST.get("action")
+    raw_id = request.POST.get("acceptance", "")
+    if action not in {"extend", "expire"} or not raw_id:
+        return HttpResponseBadRequest(_("Choose an action and a risk acceptance."))
+    acceptance = _object_or_404(Risk_Acceptance, raw_id)
+    engagement = acceptance.engagement
+    if engagement is None:
+        raise Http404
+    user_has_permission_or_403(request.user, engagement, "edit")
+    back = redirect(reverse("company_risk_inbox") + "?tab=expiring")
+    if acceptance.expiration_date_handled:
+        messages.info(request, _("This risk acceptance has expired already."), extra_tags="alert-info")
+        return back
+    if acceptance.expiration_date is None:  # never expires: not in the Expiring tab, and extending would time-box it
+        return HttpResponseBadRequest(_("This risk acceptance never expires."))
+    if action == "expire":
+        with pghistory.context(source="company_risk_expiring"), teams.instance_language():
+            ra_helper.expire_now(acceptance, user=request.user, reason=_("let expire in the risk acceptance inbox"))
+        messages.success(request, _("The risk acceptance has expired; its findings are open again if it reactivates them."),
+                         extra_tags="alert-success")
+        return back
+    # like upstream's reinstate and edit pages: no extending once the product switched full risk acceptance off
+    if not risk_requests.is_approver(request.user) or not engagement.product.enable_full_risk_acceptance:
+        raise PermissionDenied
+    days = request.POST.get("days", "")
+    if not (days.isascii() and days.isdigit()) or int(days) not in settings.COMPANY_RA_DAYS:
+        return HttpResponseBadRequest(_("Choose one of the offered durations."))
+    with pghistory.context(source="company_risk_expiring"):
+        risk_requests.extend(acceptance, int(days), request.user)
+    messages.success(request, _("The risk acceptance now expires on %(date)s.") % {
+        "date": date_format(timezone.localtime(acceptance.expiration_date), "DATE_FORMAT")}, extra_tags="alert-success")
+    return back
 
 
 @login_required

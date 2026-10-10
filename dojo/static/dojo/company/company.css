@@ -76,7 +76,44 @@
 }
 .company-bulk-assign {
   display: inline-block;
-  margin-left: 0.25rem;
+  margin-inline-start: 0.25rem;
+}
+
+/* EN / Arabic switch at the end of the user menu (company base.html, block settings-dropdown-items). */
+.company-language {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+.company-language-option {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.company-language-option:hover,
+.company-language-option:focus {
+  background: #f3f4f6;
+}
+.company-language-option[aria-pressed="true"] {
+  border-color: var(--color-dd-primary-500);
+  font-weight: 600;
+}
+
+/* Expiring tab actions (company/risk_inbox.html). */
+.company-risk-expiring {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+.company-risk-expiring select.form-control {
+  width: auto;
 }
 
 /* "My work" tiles above the upstream dashboard tiles (dojo/dashboard.html). */
@@ -86,7 +123,7 @@
 
 /* Risk acceptance: sidebar count (company/_sidebar.html), finding page badge, inbox rows (company/risk_inbox.html). */
 .company-nav-count {
-  margin-left: auto;
+  margin-inline-start: auto;
   min-width: 1.5rem;
   padding: 0 0.4rem;
   border-radius: 9999px;

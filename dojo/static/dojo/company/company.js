@@ -1,7 +1,7 @@
 /*
  * company: small enhancements of upstream pages, loaded with defer from block extra_javascript in the
  * company base.html, so the whole page is parsed when it runs. It must never throw: upstream selenium
- * fails a test on any console error. Plain DOM only; nothing here waits for Alpine or jQuery.
+ * fails a test on any console error. Plain DOM only, apart from opening the current sidebar section through Alpine.
  */
 (function () {
   "use strict";
@@ -14,7 +14,7 @@
     }
   }
 
-  // "Assign…" and "Request risk acceptance…" in the findings bulk menu. The forms come from
+  // "Assign…", "Request risk acceptance…" and "Mark fixed…" in the findings bulk menu. The forms come from
   // <template id="company-bulk"> (company base.html, block modals). Only where form#bulk_change_form posts to a
   // findings bulk URL: the finding page has an endpoint bulk menu with the same ids, which must not get them.
   function addBulkForms() {
@@ -53,11 +53,46 @@
     });
   }
 
-  try {
-    addBulkForms();
-  } catch (e) {
-    if (window.console && console.warn) {
-      console.warn("company.js:", e);
+  // Open the upstream sidebar section (an Alpine accordion, x-data="{ open: false }") holding a link to this page.
+  // Before Alpine has initialised a section, $data has no "open" and the section is skipped. Non-staff users only,
+  // recognised by the declutter stylesheet (company/_declutter.html): upstream selenium runs as a superuser and
+  // relies on closed sections, both for link-text lookups (a visible sidebar "Add Asset" wins over the page's own)
+  // and for header clicks that must open, not close, a section (notifications_test.py).
+  function openCurrentSection() {
+    if (!document.getElementById("company-declutter")) {
+      return;
+    }
+    if (typeof window.Alpine === "undefined" || typeof window.Alpine.$data !== "function") {
+      return;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("#dd-sidebar div[x-data]"), function (section) {
+      var links = section.querySelectorAll(":scope > div a[href]");
+      var here = Array.prototype.some.call(links, function (link) {
+        return samePath(link.getAttribute("href"), window.location.href);
+      });
+      if (here) {
+        var data = window.Alpine.$data(section);
+        if (data && "open" in data && !data.open) {
+          data.open = true;
+        }
+      }
+    });
+  }
+
+  function safely(step) {
+    try {
+      step();
+    } catch (e) {
+      if (window.console && console.warn) {
+        console.warn("company.js:", e);
+      }
     }
   }
+
+  safely(addBulkForms);
+  // Alpine (deferred in <head>) normally starts before this deferred script runs; otherwise wait for it
+  document.addEventListener("alpine:initialized", function () {
+    safely(openCurrentSection);
+  });
+  safely(openCurrentSection);
 })();
