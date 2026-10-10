@@ -1,0 +1,7 @@
+{# company: one quick-upload field (label, widget, errors, help), included by company/quick_upload.html. #}
+<div class="form-group{% if field.errors %} has-error{% endif %}">
+    <label class="control-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<sup>*</sup>{% endif %}</label>
+    {{ field }}
+    {% for error in field.errors %}<p class="help-block">{{ error }}</p>{% endfor %}
+    {% if field.help_text %}<p class="help-block" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+</div>

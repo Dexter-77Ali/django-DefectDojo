@@ -16,8 +16,11 @@ INSTALLED_APPS += ("dojo.company",)  # noqa: F821 -- defined by settings.dist.py
 # base.html can extend upstream's ("recursive extends") and override blocks.
 _DOJO_TEMPLATE_DIRS.insert(0, root("dojo/company/templates"))  # noqa: F821
 
+# company: company routes under <url_prefix>company/, then every upstream route (dojo/company/urls.py).
+ROOT_URLCONF = "dojo.company.urls"
+
 # Swap the upstream context processor for the company wrapper (same values,
-# plus COMPANY_NAME, minus the Pro upsell link).
+# plus COMPANY_NAME, minus the Pro upsell link and banners).
 _context_processors = TEMPLATES[0]["OPTIONS"]["context_processors"]  # noqa: F821
 _context_processors[_context_processors.index("dojo.context_processors.globalize_vars")] = (
     "dojo.company.context_processors.globalize_vars"
@@ -39,6 +42,22 @@ COMPANY_PALETTE = _company_json("DD_COMPANY_PALETTE", {})
 COMPANY_SLA_FACTORS = _company_json("DD_COMPANY_SLA_FACTORS", None)
 # {"owner-team": {"label": "Owner team"}, "criticality": {"label": "...", "choices": [...]}}: replaces the default fields.
 COMPANY_FIELDS = _company_json("DD_COMPANY_FIELDS", None)
+# Engagement that UI uploads and CI re-imports share, so fixed findings close across both.
+COMPANY_UPLOAD_ENGAGEMENT_NAME = env("DD_COMPANY_UPLOAD_ENGAGEMENT_NAME", default="Security scans")  # noqa: F821
+# Scanner allowlist applied by `manage.py company_scan_types` (comma separated scan types); empty = every scanner.
+COMPANY_SCAN_TYPES = env.list("DD_COMPANY_SCAN_TYPES", default=[])  # noqa: F821
+# Durations a risk acceptance can be requested for (dojo/company/risk_requests.py), comma separated days.
+COMPANY_RA_DAYS = [int(days) for days in env.list("DD_COMPANY_RA_DAYS", default=[]) if days.strip()] or [30, 90, 180]  # noqa: F821
+# Only approvers (the security team) accept risk; everyone else requests it (dojo/company/signals.py). Off in code.
+COMPANY_RA_APPROVAL_REQUIRED = env.bool("DD_COMPANY_RA_APPROVAL_REQUIRED", default=False)  # noqa: F821
+# "Mark fixed" on the finding page and in the findings bulk menu (dojo/company/views.py mark_fixed); False hides it
+# where developers may not close findings themselves.
+COMPANY_MARK_FIXED = env.bool("DD_COMPANY_MARK_FIXED", default=True)  # noqa: F821
+
+# --- translations ---------------------------------------------------------------
+# Company strings (dojo/company/locale/<lang>/LC_MESSAGES/django.po), searched before upstream's catalogs.
+# Only .po files are committed, as upstream does; Dockerfile.company compiles them into the image.
+LOCALE_PATHS.insert(0, root("dojo/company/locale"))  # noqa: F821
 
 # --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
 # Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here
@@ -56,8 +75,12 @@ if COMPANY_LDAP_ENABLED:
 
 # --- notifications (see dojo/company/notifications.py) ----------------------------
 NOTIFICATION_MANAGER = "dojo.company.notifications.CompanyNotificationManager"
+# Assignments (dojo/company/teams.py) reach the assignee on the system channels too, like upstream's review requests.
+NOTIFICATIONS_SYSTEM_LEVEL_TRUMP += ["company_finding_assigned"]  # noqa: F821 -- set by dojo.notifications.settings
+# Risk acceptance requests and decisions (dojo/company/risk_requests.py), likewise.
+NOTIFICATIONS_SYSTEM_LEVEL_TRUMP += ["company_risk_requested", "company_risk_decided"]
 COMPANY_ESCALATION_EMAILS = env.list("DD_COMPANY_ESCALATION_EMAILS", default=[])  # noqa: F821
 COMPANY_ESCALATION_EVENTS = env.list(  # noqa: F821
     "DD_COMPANY_ESCALATION_EVENTS",
-    default=["sla_breach", "sla_breach_combined", "risk_acceptance_expiration"],
+    default=["sla_breach", "sla_breach_combined", "risk_acceptance_expiration", "company_risk_requested"],
 )

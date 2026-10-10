@@ -1,0 +1,78 @@
+{% load i18n %}
+{% load authorization_tags %}
+{% load company_tags %}
+{# company: actions under upstream's tab bar, included from block tab_bar in company base.html after block.super. #}
+{# Links are "btn btn-success btn-sm" and buttons only "btn btn-default btn-sm", never btn-primary, dropdown-toggle or an upstream #}
+{# link text: upstream selenium clicks the nth btn-primary and finds links by text. Each action needs its permission on the object. #}
+{% url 'company_quick_upload' as company_upload_url %}
+{% url 'company_assign' as company_assign_url %}
+{% with page=request.resolver_match.url_name %}
+    {% if page == "view_test" and test and company_upload_url %}
+        {# show_re_upload: upstream's view_test flag for tests whose type is an active parser (manual tests are not) #}
+        {% if show_re_upload and test|has_object_permission:"import" %}
+            <div class="company-quick-actions">
+                <a class="btn btn-success btn-sm" href="{{ company_upload_url }}?test={{ test.id }}" data-testid="company-upload-new-report">
+                    <i class="fa-solid fa-upload"></i> {% trans "Upload new report" %}
+                </a>
+            </div>
+        {% endif %}
+    {% elif page == "view_product" or page == "product_open_findings" or page == "view_engagements" or page == "view_engagement" %}
+        {# product overview, findings, engagements: not upstream's import, re-import, edit or delete pages #}
+        {% if company_upload_url and product_tab.product and product_tab.product|has_object_permission:"import" %}
+            <div class="company-quick-actions">
+                <a class="btn btn-success btn-sm" href="{{ company_upload_url }}?product={{ product_tab.product.id }}" data-testid="company-upload-report">
+                    <i class="fa-solid fa-upload"></i> {% trans "Upload report" %}
+                </a>
+            </div>
+        {% endif %}
+    {% elif page == "view_finding" and finding and company_assign_url %}
+        {% if finding|has_object_permission:"edit" %}
+            {% company_assignment finding as assignment %}
+            <form method="post" action="{{ company_assign_url }}" class="company-quick-actions company-assign" data-testid="company-assign-finding">
+                {% csrf_token %}
+                <input type="hidden" name="finding_to_update" value="{{ finding.id }}">
+                <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                <span class="company-assign-current" data-testid="company-assigned">
+                    {% if assignment.team %}
+                        {% blocktrans with team=assignment.team person=assignment.person|default:_("nobody") %}Assigned: {{ team }} / {{ person }}{% endblocktrans %}
+                    {% else %}
+                        {% trans "Not assigned" %}
+                    {% endif %}
+                </span>
+                {% if assignment.teams %}
+                    {% include "company/_assign_fields.html" with teams=assignment.teams team=assignment.team person_username=assignment.person %}
+                    <button type="submit" class="btn btn-default btn-sm" data-testid="company-assign-save">
+                        <i class="fa-solid fa-user-tag"></i> {% trans "Assign" %}
+                    </button>
+                {% endif %}
+            </form>
+            {% url 'company_mark_fixed' finding.id as company_mark_fixed_url %}
+            {% if COMPANY_MARK_FIXED and finding.active and company_mark_fixed_url %}
+                {# one POST to upstream's close_finding; with mandatory note types the view sends the user to upstream's close page #}
+                <form method="post" action="{{ company_mark_fixed_url }}" class="company-quick-actions" data-testid="company-mark-fixed-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-default btn-sm" data-testid="company-mark-fixed">
+                        <i class="fa-solid fa-circle-check"></i> {% trans "Mark fixed" %}
+                    </button>
+                </form>
+            {% endif %}
+            {% url 'company_risk_request' as company_risk_request_url %}
+            {% if company_risk_request_url %}
+                {# open, not accepted findings of products with full risk acceptance on; a waiting request shows instead #}
+                {% company_risk_finding finding as company_risk %}
+                {% if company_risk.pending or company_risk.can_request %}
+                    <div class="company-quick-actions" data-testid="company-risk-finding">
+                        {% if company_risk.pending %}
+                            <span class="label label-warning company-risk-pending" data-testid="company-risk-pending">{% trans "Pending approval" %}</span>
+                        {% else %}
+                            <a class="btn btn-default btn-sm" href="{{ company_risk_request_url }}?finding={{ finding.id }}&amp;return_url={{ request.get_full_path|urlencode }}" data-testid="company-risk-request">
+                                <i class="fa-solid fa-scale-balanced"></i> {% trans "Request risk acceptance" %}
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    {% endif %}
+{% endwith %}

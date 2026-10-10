@@ -29,7 +29,16 @@ x-company-env: &company-env
   DD_COMPANY_FIELDS: "${DD_COMPANY_FIELDS:-}"
   DD_COMPANY_SLA_FACTORS: "${DD_COMPANY_SLA_FACTORS:-}"
   DD_COMPANY_ESCALATION_EMAILS: "${DD_COMPANY_ESCALATION_EMAILS:-}"
-  DD_COMPANY_ESCALATION_EVENTS: "${DD_COMPANY_ESCALATION_EVENTS:-sla_breach,sla_breach_combined,risk_acceptance_expiration}"
+  DD_COMPANY_ESCALATION_EVENTS: "${DD_COMPANY_ESCALATION_EVENTS:-sla_breach,sla_breach_combined,risk_acceptance_expiration,company_risk_requested}"
+  # engagement shared by UI uploads and CI re-imports (engagement_name in the CI recipe, docker/company/README.md)
+  DD_COMPANY_UPLOAD_ENGAGEMENT_NAME: "${DD_COMPANY_UPLOAD_ENGAGEMENT_NAME:-Security scans}"
+  # scanner allowlist for `manage.py company_scan_types` (comma separated scan types; empty = every scanner)
+  DD_COMPANY_SCAN_TYPES: "${DD_COMPANY_SCAN_TYPES:-}"
+  # risk acceptance: durations a request can ask for (days), and whether only approvers (the security team) accept risk
+  DD_COMPANY_RA_DAYS: "${DD_COMPANY_RA_DAYS:-30,90,180}"
+  DD_COMPANY_RA_APPROVAL_REQUIRED: "${DD_COMPANY_RA_APPROVAL_REQUIRED:-False}"
+  # "Mark fixed" on findings (one click closes them as mitigated); False where developers may not close findings
+  DD_COMPANY_MARK_FIXED: "${DD_COMPANY_MARK_FIXED:-True}"
   DD_COMPANY_LDAP_ENABLED: "${DD_COMPANY_LDAP_ENABLED:-False}"
   # ad = Active Directory (sAMAccountName, memberOf); openldap = RFC groups (uid, groupOfNames)
   DD_COMPANY_LDAP_PROFILE: "${DD_COMPANY_LDAP_PROFILE:-ad}"
@@ -43,6 +52,10 @@ x-company-env: &company-env
   DD_COMPANY_LDAP_GROUP_BASE: "${DD_COMPANY_LDAP_GROUP_BASE:-ou=groups,dc=company,dc=test}"
   DD_COMPANY_LDAP_ADMIN_GROUP: "${DD_COMPANY_LDAP_ADMIN_GROUP:-cn=dojo-admins,ou=groups,dc=company,dc=test}"
   DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX: "${DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX:-dojo-pt-}"
+  # groups named <prefix><team> put their members in the team (findings are assigned to teams)
+  DD_COMPANY_LDAP_TEAM_GROUP_PREFIX: "${DD_COMPANY_LDAP_TEAM_GROUP_PREFIX:-dojo-team-}"
+  # group DN of the security team: its members approve risk acceptance requests (Django group risk-approvers)
+  DD_COMPANY_LDAP_RISK_APPROVER_GROUP: "${DD_COMPANY_LDAP_RISK_APPROVER_GROUP:-cn=dojo-security,ou=groups,dc=company,dc=test}"
 
 services:
   uwsgi:
@@ -59,7 +72,7 @@ services:
     environment: *company-env
 
   # Local test directory, only with `--profile ldap`. Seeded from docker/company/ldap/*.ldif
-  # (users alice/bob/carol, groups dojo-admins and dojo-pt-<product type>). Not for production.
+  # (users alice/bob/carol/dave/sam, groups dojo-admins, dojo-security, dojo-pt-<product type> and dojo-team-<team>). Not for production.
   ldap:
     image: osixia/openldap:1.5.0
     profiles:

@@ -2,14 +2,30 @@
 {% load static %}
 {% load i18n %}
 {% load display_tags %}
-{# company: extends upstream dojo/templates/base.html through recursive template loading and #}
-{# overrides four blocks only. Everything else renders from the upstream file. #}
+{% load company_tags %}
+{# company: extends upstream dojo/templates/base.html through recursive template loading and overrides only blocks that no #}
+{# upstream leaf template overrides: header_logo, sidebar-items (company shortcuts, then upstream's items), tab_bar #}
+{# (upstream's tabs, then company actions), support-tab, dojo_css (company stylesheet, palette, non-staff declutter, upstream add #}
+{# risk acceptance links hidden when approval is required and the user is no approver), #}
+{# modals (the bulk "Assign…", "Request risk acceptance…" and "Mark fixed…" forms company.js moves into the findings bulk menu), #}
+{# settings-dropdown-items (upstream's items, then the EN / Arabic switch), extra_javascript (company.js) and footer. #}
+{# Everything else renders from the upstream file. #}
 
 {% block header_logo %}
     <a href="{% url 'home' %}" class="flex items-center gap-2 min-w-0">
         <img src="{% static 'dojo/company/icon.png' %}" alt="{{ COMPANY_NAME }}" class="w-8 h-8 flex-shrink-0">
         <span class="text-lg font-semibold text-white truncate">{{ COMPANY_NAME }}</span>
     </a>
+{% endblock %}
+
+{% block sidebar-items %}
+    {% include "company/_sidebar.html" %}
+    {{ block.super }}
+{% endblock %}
+
+{% block tab_bar %}
+    {{ block.super }}
+    {% include "company/_quick_actions.html" %}
 {% endblock %}
 
 {% block support-tab %}{% endblock %}
@@ -20,6 +36,87 @@
     {% if COMPANY_PALETTE %}
     <style id="company-palette">:root{ {% for shade, color in COMPANY_PALETTE.items %}--color-dd-primary-{{ shade }}:{{ color }};{% endfor %} }</style>
     {% endif %}
+    {% if request.user.is_authenticated and not request.user.is_staff and not request.user.is_superuser %}
+        {% include "company/_declutter.html" %}
+        {% company_ra_restricted request.user as company_ra_restricted %}
+        {% if company_ra_restricted %}
+            {# approval required (DD_COMPANY_RA_APPROVAL_REQUIRED) and no approver: upstream's add risk acceptance links would end in a 403 #}
+            <style id="company-ra-restricted">
+            a[href*="/risk_acceptance/add"], li:has(> a[href*="/risk_acceptance/add"]) { display: none !important; }
+            </style>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block modals %}
+    {{ block.super }}
+    {% if request.user.is_authenticated %}
+        {% url 'company_assign' as company_assign_url %}
+        {% url 'company_risk_request' as company_risk_request_url %}
+        {% url 'finding_bulk_update_all' as company_findings_bulk_url %}
+        {% if product_tab.product %}{% url 'finding_bulk_update_all_product' product_tab.product.id as company_product_bulk_url %}{% endif %}
+        {% if company_assign_url and company_findings_bulk_url %}
+            {# company.js moves these forms into #bulk_edit_menu, but only where form#bulk_change_form posts to one of these findings #}
+            {# bulk URLs: the finding page's endpoint bulk menu reuses the same ids. Inert until then (a template element). #}
+            <template id="company-bulk"
+                      data-findings-bulk-url="{{ company_findings_bulk_url }}"
+                      data-findings-bulk-product-url="{{ company_product_bulk_url|default:'' }}">
+                <form method="post" action="{{ company_assign_url }}" class="company-bulk-assign" data-testid="company-bulk-assign-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-default btn-sm" data-testid="company-bulk-assign">
+                        <i class="fa-solid fa-user-tag"></i> {% trans "Assign…" %}
+                    </button>
+                </form>
+                {% if company_risk_request_url %}
+                    <form method="post" action="{{ company_risk_request_url }}" class="company-bulk-assign" data-testid="company-bulk-risk-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-default btn-sm" data-testid="company-bulk-risk">
+                            <i class="fa-solid fa-scale-balanced"></i> {% trans "Request risk acceptance…" %}
+                        </button>
+                    </form>
+                {% endif %}
+                {% url 'company_mark_fixed_bulk' as company_mark_fixed_url %}
+                {% if COMPANY_MARK_FIXED and company_mark_fixed_url %}
+                    {% trans "Close the selected findings as fixed?" as company_mark_fixed_confirm %}
+                    <form method="post" action="{{ company_mark_fixed_url }}" class="company-bulk-assign" data-testid="company-bulk-fixed-form"
+                          onsubmit="return window.confirm('{{ company_mark_fixed_confirm|escapejs }}');">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_url" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-default btn-sm" data-testid="company-bulk-fixed">
+                            <i class="fa-solid fa-circle-check"></i> {% trans "Mark fixed…" %}
+                        </button>
+                    </form>
+                {% endif %}
+            </template>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block settings-dropdown-items %}
+    {{ block.super }}
+    {% if request.user.is_authenticated %}
+        {% url 'company_set_language' as company_language_url %}
+        {% if company_language_url %}
+            {# EN / Arabic switch; every other language stays available in the upstream profile form #}
+            {% get_current_language as company_language %}
+            <form method="post" action="{{ company_language_url }}" class="company-language" data-testid="company-language-form">
+                {% csrf_token %}
+                {# a page rendered from a POST (the bulk Assign… and Request risk acceptance… pages) goes back where it came from: its own URL may refuse a GET #}
+                <input type="hidden" name="return_url" value="{% if request.method == 'POST' and return_url %}{{ return_url }}{% else %}{{ request.get_full_path }}{% endif %}">
+                <i class="fa-solid fa-language fa-fw" aria-hidden="true"></i>
+                {# language names in their own language, as in upstream's LANGUAGES #}
+                <button type="submit" name="language" value="en" lang="en" aria-pressed="{% if company_language == 'en' %}true{% else %}false{% endif %}" class="company-btn company-language-option" data-testid="company-language-en">English</button>
+                <button type="submit" name="language" value="ar" lang="ar" dir="rtl" aria-pressed="{% if company_language == 'ar' %}true{% else %}false{% endif %}" class="company-btn company-language-option" data-testid="company-language-ar">العربية</button>
+            </form>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block extra_javascript %}
+    {{ block.super }}
+    <script defer src="{% static 'dojo/company/company.js' %}?v={% static_v 'dojo/company/company.js' %}"></script>
 {% endblock %}
 
 {% block footer %}

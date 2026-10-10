@@ -1,0 +1,816 @@
+# company: Arabic translations of the company strings (dojo/company templates and Python code).
+# Searched before upstream's dojo/locale catalogs (LOCALE_PATHS in dojo/settings/local_settings.py).
+# Only this .po file is committed, like upstream's catalogs; Dockerfile.company compiles it to django.mo.
+#
+# REVIEW NEEDED: first draft, not yet reviewed by a native speaker. Have a native Arabic speaker
+# review every entry before a release that advertises Arabic. Entries whose English text is also an
+# upstream string (Product, Active, Engagement, ...) override upstream's translation everywhere, so they
+# keep upstream's Arabic (dojo/locale/ar/LC_MESSAGES/django.po).
+#
+# Update after adding or changing company strings (docker/company/README.md, "Arabic"):
+#   cd dojo/company && django-admin makemessages -l ar --add-location=file --no-obsolete -e html,py
+# then translate the new or fuzzy entries and compile.
+msgid ""
+msgstr ""
+"Project-Id-Version: DefectDojo company layer\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-10 21:50+0000\n"
+"PO-Revision-Date: 2026-10-11 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+#: forms.py templates/company/_risk_findings.html templates/company/assign.html
+#: templates/company/risk_inbox.html templates/company/risk_request.html
+msgid "Product"
+msgstr "المنتج"
+
+#: forms.py
+msgid "Choose a product…"
+msgstr "اختر منتجًا…"
+
+#: forms.py
+msgid "Scanner"
+msgstr "أداة الفحص"
+
+#: forms.py
+msgid "Report file"
+msgstr "ملف التقرير"
+
+#: forms.py
+msgid "Component"
+msgstr "المكوّن"
+
+#: forms.py
+msgid "Repository or service this report covers. Each component keeps its own findings."
+msgstr "المستودع أو الخدمة التي يغطيها هذا التقرير. لكل مكوّن نتائجه الخاصة."
+
+#: forms.py
+msgid "Close fixed findings"
+msgstr "إغلاق النتائج التي تم إصلاحها"
+
+#: forms.py
+msgid "Findings of the previous report that this report no longer contains are closed."
+msgstr "تُغلق نتائج التقرير السابق التي لم يعد هذا التقرير يتضمنها."
+
+#: forms.py
+msgid "Choose a scanner…"
+msgstr "اختر أداة فحص…"
+
+#: forms.py
+msgid "Used before"
+msgstr "استُخدمت من قبل"
+
+#: forms.py
+msgid "All scanners"
+msgstr "جميع أدوات الفحص"
+
+#: forms.py
+msgid "This product already has several reports of this scanner. Pick the component this report belongs to, or name a new one."
+msgstr "لدى هذا المنتج عدة تقارير من أداة الفحص هذه. اختر المكوّن الذي ينتمي إليه هذا التقرير، أو أدخل اسم مكوّن جديد."
+
+#: forms.py
+msgid "Choose the report file."
+msgstr "اختر ملف التقرير."
+
+#: forms.py
+#, python-format
+msgid "Report file is too large. Maximum supported size is %d MB"
+msgstr "ملف التقرير كبير جداً. الحجم الأقصى المدعوم هو %d ميغابايت"
+
+#: forms.py
+msgid "Justification"
+msgstr "المبرر"
+
+#: forms.py
+msgid "Why the risk can be accepted: compensating controls, the planned fix and its date, the business reason."
+msgstr "لماذا يمكن قبول المخاطرة: الضوابط التعويضية، والإصلاح المخطط له وموعده، والسبب المتعلق بالعمل."
+
+#: forms.py
+msgid "Accept for"
+msgstr "القبول لمدة"
+
+#: forms.py
+#, python-format
+msgid "%(days)d day"
+msgid_plural "%(days)d days"
+msgstr[0] "%(days)d يوم"
+msgstr[1] "%(days)d يوم"
+msgstr[2] "%(days)d يومان"
+msgstr[3] "%(days)d أيام"
+msgstr[4] "%(days)d يومًا"
+msgstr[5] "%(days)d يوم"
+
+#: models.py
+msgid "Waiting for approval"
+msgstr "بانتظار الموافقة"
+
+#: models.py
+msgid "Approved"
+msgstr "تمت الموافقة"
+
+#: models.py
+msgid "Rejected"
+msgstr "مرفوض"
+
+#: models.py
+msgid "Cancelled"
+msgstr "ملغى"
+
+#: risk_requests.py
+msgid "not open, or already risk accepted"
+msgstr "غير مفتوحة، أو مقبولة المخاطرة مسبقًا"
+
+#: risk_requests.py
+msgid "already waiting for approval"
+msgstr "بانتظار الموافقة مسبقًا"
+
+#: risk_requests.py
+msgid "risk acceptance is turned off for its product"
+msgstr "قبول المخاطرة معطّل لمنتجها"
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s requested risk acceptance for %(days)d days (request #%(id)d): %(justification)s"
+msgstr "طلب %(user)s قبول المخاطرة لمدة %(days)d يومًا (الطلب رقم %(id)d): %(justification)s"
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s requests risk acceptance of %(count)d finding for %(days)d days"
+msgid_plural "%(user)s requests risk acceptance of %(count)d findings for %(days)d days"
+msgstr[0] "يطلب %(user)s قبول مخاطرة %(count)d نتيجة لمدة %(days)d يومًا"
+msgstr[1] "يطلب %(user)s قبول مخاطرة %(count)d نتيجة لمدة %(days)d يومًا"
+msgstr[2] "يطلب %(user)s قبول مخاطرة %(count)d نتيجتين لمدة %(days)d يومًا"
+msgstr[3] "يطلب %(user)s قبول مخاطرة %(count)d نتائج لمدة %(days)d يومًا"
+msgstr[4] "يطلب %(user)s قبول مخاطرة %(count)d نتيجة لمدة %(days)d يومًا"
+msgstr[5] "يطلب %(user)s قبول مخاطرة %(count)d نتيجة لمدة %(days)d يومًا"
+
+#: risk_requests.py
+msgid "Nobody decides their own risk acceptance request."
+msgstr "لا يمكن لأحد البتّ في طلب قبول المخاطرة الخاص به."
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s approved your risk acceptance request #%(id)d"
+msgstr "وافق %(user)s على طلبك لقبول المخاطرة رقم %(id)d"
+
+#: risk_requests.py
+#, python-format
+msgid "request #%(id)d"
+msgstr "الطلب رقم %(id)d"
+
+#: risk_requests.py
+#, python-format
+msgid "Request #%(id)d: %(title)s"
+msgid_plural "Request #%(id)d: %(title)s and %(more)d more"
+msgstr[0] "الطلب رقم %(id)d: %(title)s و%(more)d أخرى"
+msgstr[1] "الطلب رقم %(id)d: %(title)s"
+msgstr[2] "الطلب رقم %(id)d: %(title)s و%(more)d أخرى"
+msgstr[3] "الطلب رقم %(id)d: %(title)s و%(more)d أخرى"
+msgstr[4] "الطلب رقم %(id)d: %(title)s و%(more)d أخرى"
+msgstr[5] "الطلب رقم %(id)d: %(title)s و%(more)d أخرى"
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s rejected risk acceptance request #%(id)d: %(reason)s"
+msgstr "رفض %(user)s طلب قبول المخاطرة رقم %(id)d: %(reason)s"
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s rejected your risk acceptance request #%(id)d: %(reason)s"
+msgstr "رفض %(user)s طلبك لقبول المخاطرة رقم %(id)d: %(reason)s"
+
+#: risk_requests.py
+#, python-format
+msgid "%(user)s cancelled risk acceptance request #%(id)d"
+msgstr "ألغى %(user)s طلب قبول المخاطرة رقم %(id)d"
+
+#: risk_requests.py
+#, python-format
+msgid "by %(days)d day, until %(date)s"
+msgid_plural "by %(days)d days, until %(date)s"
+msgstr[0] "بمقدار %(days)d يوم، حتى %(date)s"
+msgstr[1] "بمقدار %(days)d يوم، حتى %(date)s"
+msgstr[2] "بمقدار %(days)d يومين، حتى %(date)s"
+msgstr[3] "بمقدار %(days)d أيام، حتى %(date)s"
+msgstr[4] "بمقدار %(days)d يومًا، حتى %(date)s"
+msgstr[5] "بمقدار %(days)d يوم، حتى %(date)s"
+
+#: signals.py
+msgid "Only the security team accepts risk. Use Request risk acceptance on the findings."
+msgstr "فريق الأمن وحده يقبل المخاطرة. استخدم «طلب قبول المخاطرة» على النتائج."
+
+#: teams.py
+#, python-format
+msgid "Assigned to %(team)s / %(person)s by %(user)s"
+msgstr "أُسندت إلى %(team)s / %(person)s بواسطة %(user)s"
+
+#: teams.py
+#, python-format
+msgid "Assigned to %(team)s by %(user)s"
+msgstr "أُسندت إلى %(team)s بواسطة %(user)s"
+
+#: teams.py
+#, python-format
+msgid "team %(team)s"
+msgstr "الفريق %(team)s"
+
+#: teams.py
+#, python-format
+msgid "%(user)s assigned %(count)d finding to %(target)s"
+msgid_plural "%(user)s assigned %(count)d findings to %(target)s"
+msgstr[0] "أسند %(user)s %(count)d نتيجة إلى %(target)s"
+msgstr[1] "أسند %(user)s %(count)d نتيجة إلى %(target)s"
+msgstr[2] "أسند %(user)s %(count)d نتيجتين إلى %(target)s"
+msgstr[3] "أسند %(user)s %(count)d نتائج إلى %(target)s"
+msgstr[4] "أسند %(user)s %(count)d نتيجة إلى %(target)s"
+msgstr[5] "أسند %(user)s %(count)d نتيجة إلى %(target)s"
+
+#: templates/base.html
+msgid "Assign…"
+msgstr "إسناد…"
+
+#: templates/base.html
+msgid "Request risk acceptance…"
+msgstr "طلب قبول المخاطرة…"
+
+#: templates/base.html
+msgid "Close the selected findings as fixed?"
+msgstr "إغلاق النتائج المحددة باعتبارها مُصلَحة؟"
+
+#: templates/base.html
+msgid "Mark fixed…"
+msgstr "تحديد كمُصلَحة…"
+
+#: templates/base.html
+msgid "Built on DefectDojo, licensed under the"
+msgstr "مبني على DefectDojo، ومرخّص بموجب"
+
+#: templates/base.html
+msgid "Dependencies Notice"
+msgstr "إشعار التبعيات"
+
+#: templates/company/_assign_fields.html
+msgid "Team"
+msgstr "الفريق"
+
+#: templates/company/_assign_fields.html
+msgid "Choose a team…"
+msgstr "اختر فريقًا…"
+
+#: templates/company/_assign_fields.html
+msgid "Person (optional)"
+msgstr "الشخص (اختياري)"
+
+#: templates/company/_assign_fields.html
+msgid "Whole team"
+msgstr "الفريق بأكمله"
+
+#: templates/company/_quick_actions.html views.py
+msgid "Upload new report"
+msgstr "رفع تقرير جديد"
+
+#: templates/company/_quick_actions.html
+msgid "Upload report"
+msgstr "رفع تقرير"
+
+#: templates/company/_quick_actions.html
+msgid "nobody"
+msgstr "لا أحد"
+
+#: templates/company/_quick_actions.html
+#, python-format
+msgid "Assigned: %(team)s / %(person)s"
+msgstr "مُسندة إلى: %(team)s / %(person)s"
+
+#: templates/company/_quick_actions.html
+msgid "Not assigned"
+msgstr "غير مُسندة"
+
+#: templates/company/_quick_actions.html templates/company/assign.html
+msgid "Assign"
+msgstr "إسناد"
+
+#: templates/company/_quick_actions.html
+msgid "Mark fixed"
+msgstr "تحديد كمُصلَحة"
+
+#: templates/company/_quick_actions.html
+msgid "Pending approval"
+msgstr "بانتظار الموافقة"
+
+#: templates/company/_quick_actions.html views.py
+msgid "Request risk acceptance"
+msgstr "طلب قبول المخاطرة"
+
+#: templates/company/_risk_findings.html templates/company/assign.html
+#: templates/company/risk_request.html
+msgid "Severity"
+msgstr "الخطورة"
+
+#: templates/company/_risk_findings.html templates/company/assign.html
+#: templates/company/risk_request.html
+msgid "Title"
+msgstr "العنوان"
+
+#: templates/company/_risk_findings.html templates/company/risk_inbox.html
+msgid "Status"
+msgstr "الحالة"
+
+#: templates/company/_sidebar.html
+msgid "My work"
+msgstr "عملي"
+
+#: templates/company/_sidebar.html views.py
+msgid "Upload scan"
+msgstr "رفع فحص"
+
+#: templates/company/_sidebar.html
+msgid "My findings"
+msgstr "نتائجي"
+
+#: templates/company/_sidebar.html
+msgid "My team's findings"
+msgstr "نتائج فريقي"
+
+#: templates/company/_sidebar.html templates/company/risk_inbox.html views.py
+msgid "Risk acceptance"
+msgstr "قبول المخاطرة"
+
+#: templates/company/_sidebar.html templates/company/risk_inbox.html
+#: templates/dojo/dashboard.html
+msgid "Waiting for my approval"
+msgstr "بانتظار موافقتي"
+
+#: templates/company/_sidebar.html
+msgid "Build a report"
+msgstr "إنشاء تقرير"
+
+#: templates/company/_work_tile.html
+msgid "Open the list"
+msgstr "فتح القائمة"
+
+#: templates/company/assign.html
+#, python-format
+msgid "Assign %(counter)s finding"
+msgid_plural "Assign %(counter)s findings"
+msgstr[0] "إسناد %(counter)s نتيجة"
+msgstr[1] "إسناد %(counter)s نتيجة"
+msgstr[2] "إسناد %(counter)s نتيجتين"
+msgstr[3] "إسناد %(counter)s نتائج"
+msgstr[4] "إسناد %(counter)s نتيجة"
+msgstr[5] "إسناد %(counter)s نتيجة"
+
+#: templates/company/assign.html
+msgid "The person is optional. Only active team members who can open every selected finding are listed, grouped by team."
+msgstr "الشخص اختياري. لا تُعرض إلا أسماء أعضاء الفرق النشطين الذين يمكنهم فتح كل النتائج المحددة، مجمّعين حسب الفريق."
+
+#: templates/company/assign.html
+msgid "Save"
+msgstr "حفظ"
+
+#: templates/company/assign.html templates/company/quick_upload.html
+#: templates/company/risk_request.html
+msgid "Cancel"
+msgstr "إلغاء"
+
+#: templates/company/assign.html
+msgid "There are no teams yet. Teams come from the directory groups, or a superuser creates them with manage.py company_teams."
+msgstr "لا توجد فرق بعد. تأتي الفرق من مجموعات الدليل، أو ينشئها مدير النظام باستخدام manage.py company_teams."
+
+#: templates/company/assign.html templates/company/risk_request.html
+msgid "Back"
+msgstr "رجوع"
+
+#: templates/company/quick_upload.html
+#, python-format
+msgid "Upload a new report for %(test_name)s"
+msgstr "رفع تقرير جديد لـ %(test_name)s"
+
+#: templates/company/quick_upload.html
+msgid "You cannot upload to any product yet. Ask your security team to add you to your product."
+msgstr "لا يمكنك الرفع إلى أي منتج بعد. اطلب من فريق الأمن إضافتك إلى منتجك."
+
+#: templates/company/quick_upload.html
+#, python-format
+msgid "Scanner: %(scanner)s. The findings of this test are updated with the new report."
+msgstr "أداة الفحص: %(scanner)s. تُحدَّث نتائج هذا الاختبار بالتقرير الجديد."
+
+#: templates/company/quick_upload.html
+msgid "Choose a component…"
+msgstr "اختر مكوّنًا…"
+
+#: templates/company/quick_upload.html
+msgid "No component"
+msgstr "بلا مكوّن"
+
+#: templates/company/quick_upload.html
+msgid "New component…"
+msgstr "مكوّن جديد…"
+
+#: templates/company/quick_upload.html
+msgid "Name of the new component"
+msgstr "اسم المكوّن الجديد"
+
+#: templates/company/quick_upload.html
+msgid "More options"
+msgstr "خيارات إضافية"
+
+#: templates/company/quick_upload.html
+msgid "Upload"
+msgstr "رفع"
+
+#: templates/company/quick_upload.html
+msgid "Uploading…"
+msgstr "جارٍ الرفع…"
+
+#: templates/company/quick_upload.html
+msgid "All options…"
+msgstr "كل الخيارات…"
+
+#: templates/company/risk_inbox.html
+msgid "My requests"
+msgstr "طلباتي"
+
+#: templates/company/risk_inbox.html
+msgid "Active"
+msgstr "نشط"
+
+#: templates/company/risk_inbox.html
+#, python-format
+msgid "Expiring in %(days)s days"
+msgstr "تنتهي خلال %(days)s يومًا"
+
+#: templates/company/risk_inbox.html
+msgid "Approve selected"
+msgstr "الموافقة على المحدد"
+
+#: templates/company/risk_inbox.html
+#, python-format
+msgid "Select request %(id)s"
+msgstr "تحديد الطلب %(id)s"
+
+#: templates/company/risk_inbox.html
+msgid "a removed user"
+msgstr "مستخدم محذوف"
+
+#: templates/company/risk_inbox.html
+#, python-format
+msgid "#%(id)s: %(user)s asks for %(days)s days, %(counter)s finding"
+msgid_plural "#%(id)s: %(user)s asks for %(days)s days, %(counter)s findings"
+msgstr[0] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتيجة"
+msgstr[1] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتيجة"
+msgstr[2] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتيجتان"
+msgstr[3] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتائج"
+msgstr[4] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتيجة"
+msgstr[5] "#%(id)s: يطلب %(user)s مدة %(days)s يومًا، %(counter)s نتيجة"
+
+#: templates/company/risk_inbox.html
+msgid "Note (required to reject)"
+msgstr "ملاحظة (مطلوبة للرفض)"
+
+#: templates/company/risk_inbox.html
+msgid "Approve"
+msgstr "موافقة"
+
+#: templates/company/risk_inbox.html
+msgid "Reject"
+msgstr "رفض"
+
+#: templates/company/risk_inbox.html
+msgid "No request is waiting for you."
+msgstr "لا توجد طلبات بانتظارك."
+
+#: templates/company/risk_inbox.html
+msgid "Findings"
+msgstr "النتائج"
+
+#: templates/company/risk_inbox.html
+msgid "Days"
+msgstr "أيام"
+
+#: templates/company/risk_inbox.html
+msgid "Decided by"
+msgstr "صاحب القرار"
+
+#: templates/company/risk_inbox.html
+msgid "Note"
+msgstr "ملاحظة"
+
+#: templates/company/risk_inbox.html
+msgid "Risk acceptances"
+msgstr "قبولات المخاطرة"
+
+#: templates/company/risk_inbox.html
+#, python-format
+msgid "%(counter)s finding"
+msgid_plural "%(counter)s findings"
+msgstr[0] "%(counter)s نتيجة"
+msgstr[1] "%(counter)s نتيجة"
+msgstr[2] "%(counter)s نتيجتان"
+msgstr[3] "%(counter)s نتائج"
+msgstr[4] "%(counter)s نتيجة"
+msgstr[5] "%(counter)s نتيجة"
+
+#: templates/company/risk_inbox.html
+msgid "Cancel request"
+msgstr "إلغاء الطلب"
+
+#: templates/company/risk_inbox.html
+msgid "You have not requested risk acceptance yet. Use Request risk acceptance on a finding, or in the bulk menu of a findings list."
+msgstr "لم تطلب قبول المخاطرة بعد. استخدم «طلب قبول المخاطرة» في صفحة النتيجة، أو في قائمة الإجراءات الجماعية لقائمة النتائج."
+
+#: templates/company/risk_inbox.html
+msgid "Name"
+msgstr "الاسم"
+
+#: templates/company/risk_inbox.html
+msgid "Owner"
+msgstr "المالك"
+
+#: templates/company/risk_inbox.html
+msgid "Accepted by"
+msgstr "تم القبول بواسطة"
+
+#: templates/company/risk_inbox.html
+msgid "Expires"
+msgstr "ينتهي في"
+
+#: templates/company/risk_inbox.html
+msgid "Never"
+msgstr "أبدًا"
+
+#: templates/company/risk_inbox.html
+msgid "Extend by"
+msgstr "التمديد بمقدار"
+
+#: templates/company/risk_inbox.html
+#, python-format
+msgid "%(counter)s day"
+msgid_plural "%(counter)s days"
+msgstr[0] "%(counter)s يوم"
+msgstr[1] "%(counter)s يوم"
+msgstr[2] "%(counter)s يومان"
+msgstr[3] "%(counter)s أيام"
+msgstr[4] "%(counter)s يومًا"
+msgstr[5] "%(counter)s يوم"
+
+#: templates/company/risk_inbox.html
+msgid "Extend"
+msgstr "تمديد"
+
+#: templates/company/risk_inbox.html
+msgid "Let this risk acceptance expire now? Its findings open again if it reactivates them."
+msgstr "إنهاء قبول المخاطرة هذا الآن؟ تُفتح نتائجه مجددًا إذا كان يعيد تفعيلها."
+
+#: templates/company/risk_inbox.html
+msgid "Let expire"
+msgstr "إنهاء الآن"
+
+#: templates/company/risk_inbox.html
+msgid "No risk acceptance to show."
+msgstr "لا يوجد قبول مخاطرة لعرضه."
+
+#: templates/company/risk_request.html
+#, python-format
+msgid "Request risk acceptance of %(counter)s finding"
+msgid_plural "Request risk acceptance of %(counter)s findings"
+msgstr[0] "طلب قبول مخاطرة %(counter)s نتيجة"
+msgstr[1] "طلب قبول مخاطرة %(counter)s نتيجة"
+msgstr[2] "طلب قبول مخاطرة %(counter)s نتيجتين"
+msgstr[3] "طلب قبول مخاطرة %(counter)s نتائج"
+msgstr[4] "طلب قبول مخاطرة %(counter)s نتيجة"
+msgstr[5] "طلب قبول مخاطرة %(counter)s نتيجة"
+
+#: templates/company/risk_request.html
+msgid "The security team decides. Until then the findings stay open. Once approved they are risk accepted for the chosen time and become active again when it ends."
+msgstr "يتخذ فريق الأمن القرار، وحتى ذلك الحين تبقى النتائج مفتوحة. بعد الموافقة تُقبل مخاطرتها للمدة المختارة، وتعود نشطة عند انتهائها."
+
+#: templates/company/risk_request.html
+msgid "Engagement"
+msgstr "مهمة"
+
+#: templates/company/risk_request.html
+msgid "Send request"
+msgstr "إرسال الطلب"
+
+#: templates/company/risk_request.html
+msgid "None of the selected findings can be requested."
+msgstr "لا يمكن طلب أي من النتائج المحددة."
+
+#: templates/company/risk_request.html
+msgid "Left out"
+msgstr "مستبعدة"
+
+#: templates/dojo/dashboard.html
+msgid "Assigned to me"
+msgstr "مُسندة إليّ"
+
+#: templates/dojo/dashboard.html
+msgid "My team's open findings"
+msgstr "النتائج المفتوحة لفريقي"
+
+#: templates/dojo/dashboard.html
+msgid "My overdue"
+msgstr "المتأخرة لديّ"
+
+#: templates/dojo/dashboard.html
+msgid "My risk requests"
+msgstr "طلباتي لقبول المخاطرة"
+
+#: views.py
+#, python-format
+msgid "The report could not be imported. Check that it is a %(scanner)s report and choose the file again. Details: %(error)s"
+msgstr "تعذّر استيراد التقرير. تحقّق من أنه تقرير %(scanner)s واختر الملف مرة أخرى. التفاصيل: %(error)s"
+
+#: views.py
+#, python-format
+msgid "Upload complete: %(new)d new, %(closed)d closed, %(reactivated)d reactivated, %(untouched)d unchanged."
+msgstr "اكتمل الرفع: جديدة %(new)d، مغلقة %(closed)d، أُعيد تفعيلها %(reactivated)d، دون تغيير %(untouched)d."
+
+#: views.py
+msgid "The report contained no findings, so every open finding of this test was closed. If this was the wrong scanner or file, upload the right report to reopen them."
+msgstr "لم يتضمن التقرير أي نتائج، لذا أُغلقت كل النتائج المفتوحة لهذا الاختبار. إذا كانت أداة الفحص أو الملف غير صحيحين، فارفع التقرير الصحيح لإعادة فتحها."
+
+#: views.py
+msgid "return_url must stay on this site"
+msgstr "يجب أن يبقى return_url ضمن هذا الموقع"
+
+#: views.py
+#, python-format
+msgid "Select between 1 and %(max)d findings to assign."
+msgstr "حدّد ما بين 1 و%(max)d نتيجة لإسنادها."
+
+#: views.py
+msgid "Choose one of the teams."
+msgstr "اختر أحد الفرق."
+
+#: views.py
+msgid "The chosen person is not an active member of this team who can open every selected finding."
+msgstr "الشخص المختار ليس عضوًا نشطًا في هذا الفريق يمكنه فتح كل النتائج المحددة."
+
+#: views.py
+#, python-format
+msgid "Assigned %(count)d finding to %(target)s."
+msgid_plural "Assigned %(count)d findings to %(target)s."
+msgstr[0] "تم إسناد %(count)d نتيجة إلى %(target)s."
+msgstr[1] "تم إسناد %(count)d نتيجة إلى %(target)s."
+msgstr[2] "تم إسناد %(count)d نتيجتين إلى %(target)s."
+msgstr[3] "تم إسناد %(count)d نتائج إلى %(target)s."
+msgstr[4] "تم إسناد %(count)d نتيجة إلى %(target)s."
+msgstr[5] "تم إسناد %(count)d نتيجة إلى %(target)s."
+
+#: views.py
+msgid "Assign findings"
+msgstr "إسناد النتائج"
+
+#: views.py
+#, python-format
+msgid "Select between 1 and %(max)d findings to request risk acceptance for."
+msgstr "حدّد ما بين 1 و%(max)d نتيجة لطلب قبول مخاطرتها."
+
+#: views.py
+#, python-format
+msgid "Requested risk acceptance of %(count)d finding. The security team has been notified."
+msgid_plural "Requested risk acceptance of %(count)d findings. The security team has been notified."
+msgstr[0] "تم طلب قبول مخاطرة %(count)d نتيجة. تم إبلاغ فريق الأمن."
+msgstr[1] "تم طلب قبول مخاطرة %(count)d نتيجة. تم إبلاغ فريق الأمن."
+msgstr[2] "تم طلب قبول مخاطرة %(count)d نتيجتين. تم إبلاغ فريق الأمن."
+msgstr[3] "تم طلب قبول مخاطرة %(count)d نتائج. تم إبلاغ فريق الأمن."
+msgstr[4] "تم طلب قبول مخاطرة %(count)d نتيجة. تم إبلاغ فريق الأمن."
+msgstr[5] "تم طلب قبول مخاطرة %(count)d نتيجة. تم إبلاغ فريق الأمن."
+
+#: views.py
+#, python-format
+msgid "Select between 1 and %(max)d findings to mark fixed."
+msgstr "حدّد ما بين 1 و%(max)d نتيجة لتحديدها كمُصلَحة."
+
+#: views.py
+msgid "The selected findings are closed already."
+msgstr "النتائج المحددة مغلقة مسبقًا."
+
+#: views.py
+#, python-format
+msgid "%(count)d of the selected findings needs mandatory notes before it can be closed: close it from its page. Nothing was changed."
+msgid_plural "%(count)d of the selected findings need mandatory notes before they can be closed: close them from their pages. Nothing was changed."
+msgstr[0] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحة كل منها. لم يتغيّر شيء."
+msgstr[1] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحتها. لم يتغيّر شيء."
+msgstr[2] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحة كل منها. لم يتغيّر شيء."
+msgstr[3] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحة كل منها. لم يتغيّر شيء."
+msgstr[4] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحة كل منها. لم يتغيّر شيء."
+msgstr[5] "النتائج المحددة التي تحتاج إلى ملاحظات إلزامية قبل إغلاقها: %(count)d. أغلقها من صفحة كل منها. لم يتغيّر شيء."
+
+#: views.py
+msgid "Marked fixed"
+msgstr "حُدّدت كمُصلَحة"
+
+#: views.py
+#, python-format
+msgid "Marked %(count)d finding fixed."
+msgid_plural "Marked %(count)d findings fixed."
+msgstr[0] "تم تحديد %(count)d نتيجة كمُصلَحة."
+msgstr[1] "تم تحديد %(count)d نتيجة كمُصلَحة."
+msgstr[2] "تم تحديد %(count)d نتيجتين كمُصلَحة."
+msgstr[3] "تم تحديد %(count)d نتائج كمُصلَحة."
+msgstr[4] "تم تحديد %(count)d نتيجة كمُصلَحة."
+msgstr[5] "تم تحديد %(count)d نتيجة كمُصلَحة."
+
+#: views.py
+msgid "Unknown language"
+msgstr "لغة غير معروفة"
+
+#: views.py
+msgid "Choose an action and a risk acceptance."
+msgstr "اختر إجراءً وقبول مخاطرة."
+
+#: views.py
+msgid "This risk acceptance has expired already."
+msgstr "انتهى قبول المخاطرة هذا مسبقًا."
+
+#: views.py
+msgid "This risk acceptance never expires."
+msgstr "قبول المخاطرة هذا لا ينتهي أبدًا."
+
+#: views.py
+msgid "let expire in the risk acceptance inbox"
+msgstr "أُنهي من صندوق قبول المخاطرة"
+
+#: views.py
+msgid "The risk acceptance has expired; its findings are open again if it reactivates them."
+msgstr "انتهى قبول المخاطرة، وأصبحت نتائجه مفتوحة مجددًا إذا كان يعيد تفعيلها."
+
+#: views.py
+msgid "Choose one of the offered durations."
+msgstr "اختر إحدى المدد المتاحة."
+
+#: views.py
+#, python-format
+msgid "The risk acceptance now expires on %(date)s."
+msgstr "ينتهي قبول المخاطرة الآن في %(date)s."
+
+#: views.py
+msgid "Choose an action and at least one request."
+msgstr "اختر إجراءً وطلبًا واحدًا على الأقل."
+
+#: views.py
+#, python-format
+msgid "Cancelled %(count)d request."
+msgid_plural "Cancelled %(count)d requests."
+msgstr[0] "تم إلغاء %(count)d طلب."
+msgstr[1] "تم إلغاء %(count)d طلب."
+msgstr[2] "تم إلغاء %(count)d طلبين."
+msgstr[3] "تم إلغاء %(count)d طلبات."
+msgstr[4] "تم إلغاء %(count)d طلبًا."
+msgstr[5] "تم إلغاء %(count)d طلب."
+
+#: views.py
+msgid "Give the reason for the rejection; the requester sees it."
+msgstr "اذكر سبب الرفض، فمقدّم الطلب يراه."
+
+#: views.py
+#, python-format
+msgid "Approved %(count)d request: %(created)d risk acceptances created."
+msgid_plural "Approved %(count)d requests: %(created)d risk acceptances created."
+msgstr[0] "تمت الموافقة على %(count)d طلب. قبولات المخاطرة المنشأة: %(created)d."
+msgstr[1] "تمت الموافقة على %(count)d طلب. قبولات المخاطرة المنشأة: %(created)d."
+msgstr[2] "تمت الموافقة على %(count)d طلبين. قبولات المخاطرة المنشأة: %(created)d."
+msgstr[3] "تمت الموافقة على %(count)d طلبات. قبولات المخاطرة المنشأة: %(created)d."
+msgstr[4] "تمت الموافقة على %(count)d طلبًا. قبولات المخاطرة المنشأة: %(created)d."
+msgstr[5] "تمت الموافقة على %(count)d طلب. قبولات المخاطرة المنشأة: %(created)d."
+
+#: views.py
+#, python-format
+msgid "Rejected %(count)d request."
+msgid_plural "Rejected %(count)d requests."
+msgstr[0] "تم رفض %(count)d طلب."
+msgstr[1] "تم رفض %(count)d طلب."
+msgstr[2] "تم رفض %(count)d طلبين."
+msgstr[3] "تم رفض %(count)d طلبات."
+msgstr[4] "تم رفض %(count)d طلبًا."
+msgstr[5] "تم رفض %(count)d طلب."
+
+#: views.py
+#, python-format
+msgid "%(count)d request could not be approved and is still waiting."
+msgid_plural "%(count)d requests could not be approved and are still waiting."
+msgstr[0] "تعذّرت الموافقة على %(count)d طلب، وما زالت بانتظار القرار."
+msgstr[1] "تعذّرت الموافقة على %(count)d طلب، وما زال بانتظار القرار."
+msgstr[2] "تعذّرت الموافقة على %(count)d طلبين، وما زالا بانتظار القرار."
+msgstr[3] "تعذّرت الموافقة على %(count)d طلبات، وما زالت بانتظار القرار."
+msgstr[4] "تعذّرت الموافقة على %(count)d طلبًا، وما زالت بانتظار القرار."
+msgstr[5] "تعذّرت الموافقة على %(count)d طلب، وما زالت بانتظار القرار."
+
+#: views.py
+#, python-format
+msgid "%(count)d request had been decided already."
+msgid_plural "%(count)d requests had been decided already."
+msgstr[0] "طلبات تم البتّ فيها مسبقًا: %(count)d."
+msgstr[1] "طلب تم البتّ فيه مسبقًا: %(count)d."
+msgstr[2] "طلبات تم البتّ فيها مسبقًا: %(count)d."
+msgstr[3] "طلبات تم البتّ فيها مسبقًا: %(count)d."
+msgstr[4] "طلبات تم البتّ فيها مسبقًا: %(count)d."
+msgstr[5] "طلبات تم البتّ فيها مسبقًا: %(count)d."

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load i18n %}
+{# company: request risk acceptance of findings from the security team (dojo.company.views.risk_request). #}
+{# Only classes from tailwind-out.css and company.css. #}
+{% block content %}
+    {{ block.super }}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="no-margin-top">
+                {% blocktrans count counter=eligible|length %}Request risk acceptance of {{ counter }} finding{% plural %}Request risk acceptance of {{ counter }} findings{% endblocktrans %}
+            </h3>
+        </div>
+        <div class="panel-body">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="return_url" value="{{ return_url }}">
+                {% if eligible %}
+                    <p class="help-block">
+                        {% trans "The security team decides. Until then the findings stay open. Once approved they are risk accepted for the chosen time and become active again when it ends." %}
+                    </p>
+                    <table class="table table-condensed table-striped">
+                        <thead>
+                            <tr><th>{% trans "Severity" %}</th><th>{% trans "Title" %}</th><th>{% trans "Product" %}</th><th>{% trans "Engagement" %}</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for finding in eligible %}
+                                <tr>
+                                    <td>
+                                        <input type="hidden" name="finding_to_update" value="{{ finding.id }}">
+                                        <span class="label severity severity-{{ finding.severity }}">{{ finding.severity_display }}</span>
+                                    </td>
+                                    <td><a href="{% url 'view_finding' finding.id %}">{{ finding.title|truncatechars:80 }}</a></td>
+                                    <td>{{ finding.test.engagement.product }}</td>
+                                    <td>{{ finding.test.engagement }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% include "company/_upload_field.html" with field=form.justification %}
+                    {% include "company/_upload_field.html" with field=form.days %}
+                    <div class="form-group company-upload-actions">
+                        <button type="submit" class="btn btn-primary" data-testid="company-risk-submit">
+                            <i class="fa-solid fa-paper-plane"></i> {% trans "Send request" %}
+                        </button>
+                        <a href="{{ return_url }}">{% trans "Cancel" %}</a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info" role="alert">{% trans "None of the selected findings can be requested." %}</div>
+                    <a href="{{ return_url }}">{% trans "Back" %}</a>
+                {% endif %}
+            </form>
+            {% if skipped %}
+                <h4>{% trans "Left out" %}</h4>
+                <ul data-testid="company-risk-skipped">
+                    {% for finding, reason in skipped %}
+                        <li><a href="{% url 'view_finding' finding.id %}">{{ finding.title|truncatechars:80 }}</a>: {{ reason }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{# company: less clutter for non-staff users (developers, app owners). Presentation only: permissions do not change and every hidden page #}
+{# still opens by URL for whoever may open it. Included from block dojo_css in company base.html only when the user is neither staff nor #}
+{# superuser. Selectors are built with the url tag, so they follow upstream route changes; unittests/company/test_upstream_contract.py #}
+{# fails when a name stops reversing, unittests/company/test_navigation.py when upstream markup stops matching a selector. #}
+{# :has() selectors sit in their own rule, so a browser without :has() still applies the first one. Upstream's Dashboard link and #}
+{# Reports section are hidden because the company shortcuts (company/_sidebar.html, marked with data-testid) replace them. #}
+{% url 'api_v3:openapi-view' as company_v3_docs_url %}{% url 'api_v3_reference' as company_v3_reference_url %}
+<style id="company-declutter">
+#dd-sidebar a[href="{% url 'dashboard' %}"]:not([data-testid]),
+#dd-sidebar a[href="{% url 'components' %}"],
+#dd-sidebar a[href="{% url 'test_type' %}"],
+#dd-sidebar a[href="{% url 'dev_env' %}"],
+#dd-sidebar a[href="{% url 'critical_product_metrics' %}"],
+#dd-sidebar a[href="{% url 'metrics_product_type' %}"],
+#dd-sidebar a[href="{% url 'product_type_counts' %}"],
+#dd-sidebar a[href="{% url 'product_tag_counts' %}"],
+#dd-sidebar a[href="{% url 'simple_metrics' %}"],
+#dd-sidebar a[href="{% url 'engineer_metrics' %}"],
+#dd-sidebar a[href="{% url 'regulations' %}"],
+{% if company_v3_docs_url %}#user-dropdown a[href="{{ company_v3_docs_url }}"],{% endif %}
+{% if company_v3_reference_url %}#user-dropdown a[href="{{ company_v3_reference_url }}"],{% endif %}
+#company-declutter-end { display: none !important; }
+#dd-sidebar div[x-data]:has(> a[href="{% url 'endpoint' %}"]),
+#dd-sidebar div[x-data]:has(> a[href="{% url 'report_builder' %}"]),
+{% if product_tab.product %}{% with pid=product_tab.product.id %}
+.nav-tabs > li:has(> a[href="{% url 'view_product_components' pid %}"]),
+.nav-tabs > li:has(a[href="{% url 'product_endpoint_report' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'add_api_scan_configuration' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'view_api_scan_configurations' pid %}"]),
+.dropdown-menu > li.divider:has(+ li > a[href="{% url 'add_api_scan_configuration' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'new_tool_product' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'all_tool_product' pid %}"]),
+.dropdown-menu > li.divider:has(+ li > a[href="{% url 'new_tool_product' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'add_engagement_presets' pid %}"]),
+.dropdown-menu > li:has(> a[href="{% url 'engagement_presets' pid %}"]),
+.dropdown-menu > li.divider:has(+ li > a[href="{% url 'add_engagement_presets' pid %}"]),
+{% endwith %}{% endif %}
+#company-declutter-end { display: none !important; }
+</style>

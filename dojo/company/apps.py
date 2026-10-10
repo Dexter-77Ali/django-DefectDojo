@@ -16,7 +16,7 @@ HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 class CompanyConfig(AppConfig):
 
-    """Company customizations: templates, static files, context processor, fields, SLA hooks, LDAP (see CLAUDE.md)."""
+    """Company customizations: templates, static files, context processor, fields, SLA hooks, LDAP, risk acceptance requests (see CLAUDE.md)."""
 
     name = "dojo.company"
     label = "company"
@@ -48,6 +48,10 @@ class CompanyConfig(AppConfig):
                 msg = "DD_COMPANY_LDAP_ENABLED is on but django-auth-ldap is missing; build with Dockerfile.company"
                 raise ImproperlyConfigured(msg) from e
         validate_company_configuration()
+        # security-team approval of risk acceptance on upstream paths (DD_COMPANY_RA_APPROVAL_REQUIRED)
+        from dojo.company import signals  # noqa: PLC0415 -- imports models
+
+        signals.connect()
 
 
 def validate_company_configuration() -> None:
@@ -69,4 +73,7 @@ def validate_company_configuration() -> None:
         not isinstance(fields, dict) or not fields or any(not isinstance(spec, dict) for spec in fields.values())
     ):
         msg = "DD_COMPANY_FIELDS must be a non-empty object of field name to {label, choices}"
+        raise ImproperlyConfigured(msg)
+    if any(days <= 0 for days in getattr(settings, "COMPANY_RA_DAYS", [])):
+        msg = "DD_COMPANY_RA_DAYS must list positive numbers of days, e.g. 30,90,180"
         raise ImproperlyConfigured(msg)

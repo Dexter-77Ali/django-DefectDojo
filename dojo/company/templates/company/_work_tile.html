@@ -1,0 +1,19 @@
+{% load i18n %}
+{# company: one "My work" tile (dojo/dashboard.html). tile: (count, URL of the open findings list it counts). Markup of upstream's stat cards. #}
+<div class="col-lg-3 col-md-6">
+    <div class="stat-card stat-card--{{ color }}" data-testid="{{ testid }}">
+        <div class="stat-card-body">
+            <div class="stat-card-icon">
+                <i class="fa-solid {{ icon }}"></i>
+            </div>
+            <div class="stat-card-content">
+                <span class="stat-card-value">{{ tile.0 }}</span>
+                <span class="stat-card-label">{{ label }}</span>
+            </div>
+        </div>
+        <a href="{{ tile.1 }}" class="stat-card-link">
+            <span>{% trans "Open the list" %}</span>
+            <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </div>
+</div>

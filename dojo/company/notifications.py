@@ -7,7 +7,8 @@ Wired from dojo/settings/local_settings.py:
 Added behaviour: escalation copies. For every event listed in
 COMPANY_ESCALATION_EVENTS one e-mail per event goes to the addresses in
 COMPANY_ESCALATION_EMAILS, independent of any user's notification settings
-and of the per-user mail toggle. Everything else is upstream behaviour.
+and of the per-user mail toggle. The risk_acceptance_expiration notices also reach the
+acceptance's owner. Everything else is upstream behaviour.
 Wording changes go in dojo/company/templates/notifications/<channel>/<event>.tpl
 (the company template directory is searched first).
 """
@@ -28,7 +29,22 @@ class CompanyNotificationManager(NotificationManager):
 
     def create_notification(self, event: str | None = None, **kwargs: dict) -> None:
         super().create_notification(event=event, **kwargs)
+        self._notify_risk_acceptance_owner(event, kwargs)
         self._send_escalation_copy(event, kwargs)
+
+    def _notify_risk_acceptance_owner(self, event: str | None, kwargs: dict) -> None:
+        """
+        Upstream sends risk_acceptance_expiration (expired, and the heads-up before) to the product's subscribers
+        and superusers. The owner, who asked for the acceptance (the requester of a company risk request), gets
+        it too, on their own channels for that event, unless they were among those notified already.
+        """
+        risk_acceptance = kwargs.get("risk_acceptance")
+        if event != "risk_acceptance_expiration" or risk_acceptance is None or kwargs.get("recipients") is not None:
+            return
+        owner = risk_acceptance.owner
+        if not owner.is_active or self._get_user_to_send_notifications_to().filter(pk=owner.pk).exists():
+            return
+        super().create_notification(event=event, **{**kwargs, "recipients": [owner.username]})
 
     def _send_escalation_copy(self, event: str | None, kwargs: dict) -> None:
         recipients = list(getattr(settings, "COMPANY_ESCALATION_EMAILS", []))

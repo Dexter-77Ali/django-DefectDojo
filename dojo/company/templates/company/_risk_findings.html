@@ -1,0 +1,17 @@
+{% load i18n %}
+{# company: the findings of a risk acceptance request, with severity and links (company/risk_inbox.html). #}
+<table class="table table-condensed">
+    <thead>
+        <tr><th>{% trans "Severity" %}</th><th>{% trans "Title" %}</th><th>{% trans "Product" %}</th><th>{% trans "Status" %}</th></tr>
+    </thead>
+    <tbody>
+        {% for finding in findings %}
+            <tr>
+                <td><span class="label severity severity-{{ finding.severity }}">{{ finding.severity_display }}</span></td>
+                <td><a href="{% url 'view_finding' finding.id %}">{{ finding.title|truncatechars:80 }}</a></td>
+                <td>{{ finding.test.engagement.product }}</td>
+                <td>{{ finding.status }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

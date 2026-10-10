@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load i18n %}
+{# company: assign findings to a team and optionally a person (dojo.company.views.assign). Only classes from tailwind-out.css and company.css. #}
+{% block content %}
+    {{ block.super }}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="no-margin-top">
+                {% blocktrans count counter=findings|length %}Assign {{ counter }} finding{% plural %}Assign {{ counter }} findings{% endblocktrans %}
+            </h3>
+        </div>
+        <div class="panel-body">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="return_url" value="{{ return_url }}">
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">{{ error }}</div>
+                {% endif %}
+                <table class="table table-condensed table-striped">
+                    <thead>
+                        <tr><th>{% trans "Severity" %}</th><th>{% trans "Title" %}</th><th>{% trans "Product" %}</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for finding in findings %}
+                            <tr>
+                                <td>
+                                    <input type="hidden" name="finding_to_update" value="{{ finding.id }}">
+                                    <span class="label severity severity-{{ finding.severity }}">{{ finding.severity_display }}</span>
+                                </td>
+                                <td><a href="{% url 'view_finding' finding.id %}">{{ finding.title|truncatechars:80 }}</a></td>
+                                <td>{{ finding.test.engagement.product }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if teams %}
+                    <div class="form-group">
+                        <label class="control-label" for="company-assign-team">{% trans "Team" %}<sup>*</sup></label>
+                        {% include "company/_assign_fields.html" %}
+                        <p class="help-block">
+                            {% trans "The person is optional. Only active team members who can open every selected finding are listed, grouped by team." %}
+                        </p>
+                    </div>
+                    <div class="form-group company-upload-actions">
+                        <button type="submit" class="btn btn-primary" data-testid="company-assign-save">
+                            <i class="fa-solid fa-user-tag"></i> {% trans "Save" %}
+                        </button>
+                        <a href="{{ return_url }}">{% trans "Cancel" %}</a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info" role="alert">
+                        {% trans "There are no teams yet. Teams come from the directory groups, or a superuser creates them with manage.py company_teams." %}
+                    </div>
+                    <a href="{{ return_url }}">{% trans "Back" %}</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+{% endblock %}
