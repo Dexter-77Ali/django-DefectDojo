@@ -76,6 +76,9 @@ variable no compose file passes on.
 | `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, product-type and team group prefixes) | off |
 | `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` | engagement that UI uploads and CI re-imports share, so a fixed finding closes whichever way the next scan arrives | `Security scans` |
 | `DD_COMPANY_SCAN_TYPES` | scanner allowlist, comma separated scan types, applied by `manage.py company_scan_types` (see *Scanner allowlist*) | empty: every scanner |
+| `DD_COMPANY_RA_APPROVAL_REQUIRED` | only approvers (the security team) accept risk; everyone else requests it (see *Risk acceptance*) | `False` (ZainCash: `True`) |
+| `DD_COMPANY_RA_DAYS` | durations a risk acceptance can be requested for, comma separated days | `30,90,180` |
+| `DD_COMPANY_LDAP_RISK_APPROVER_GROUP` | group DN of the security team, whose members approve risk acceptance requests | workstation: `cn=dojo-security,…`; empty = managed with `company_teams --approver` |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
 
 Logo files (`dojo/static/dojo/company/icon.png`, `logo.png`) and the upstream login logo and
@@ -95,7 +98,9 @@ build or a restart.
    *Risk acceptance expiration heads up days* = `10`. Never leave the heads-up field empty: the
    daily expiration job raises on an empty value (upstream `dojo/risk_acceptance/helper.py:295`).
 4. **No one-click acceptance.** Keep *Enable simple risk acceptance* unticked on every product
-   (product > Settings > Edit), so acceptance always goes through the risk acceptance form.
+   (product > Settings > Edit), so acceptance always goes through a request and the security team.
+   With `DD_COMPANY_RA_APPROVAL_REQUIRED=True` only an approver can switch it on, but check products
+   that had it on before the switch.
 5. **Notifications.** Open `/notifications/system` and set *Other* and *Review requested* to Mail.
    Then open `/notifications/template` and set the same two rows there: every user created
    later, directory users on their first login included, copies the template row
@@ -159,8 +164,10 @@ group per product type named `dojo-pt-<product type name>` (prefix configurable)
 superusers; members of a product-type group see that product type; everyone else can log in
 and sees nothing until a group is assigned. Create one group per team named `dojo-team-<team>`
 (`DD_COMPANY_LDAP_TEAM_GROUP_PREFIX`, default `dojo-team-`); its members form the team findings
-are assigned to (see *Teams and assignments*). The directory is authoritative: on every login a
-directory user's product types and teams are set to exactly the groups they carry. Local accounts (the bootstrap `admin`, break-glass
+are assigned to (see *Teams and assignments*). Set `DD_COMPANY_LDAP_RISK_APPROVER_GROUP` to the DN
+of the security team's group: its members approve risk acceptance requests (see *Risk acceptance*).
+The directory is authoritative: on every login a directory user's product types, teams and approver
+role are set to exactly the groups they carry. Local accounts (the bootstrap `admin`, break-glass
 and service accounts, i.e. anything with a local password) keep working through the local
 backend and are never matched by a directory account of the same name; a directory user
 named `admin` is rejected by the directory backend. Deactivating a user in DefectDojo ends
@@ -169,9 +176,9 @@ their session on the next request.
 ### Directory users before their first login
 
 Directory users get a DefectDojo account on their first login, so until then nobody can pick them as
-an assignee. `manage.py company_ldap_sync` reads the members of the admin, `dojo-pt-*` and
-`dojo-team-*` groups, creates or updates their accounts and applies the same product-type and team
-sync as a login (local accounts are never touched). Run it once at rollout and then nightly:
+an assignee. `manage.py company_ldap_sync` reads the members of the admin, risk approver, `dojo-pt-*`
+and `dojo-team-*` groups, creates or updates their accounts and applies the same product-type, team
+and approver sync as a login (local accounts are never touched). Run it once at rollout and then nightly:
 
 ```bash
 docker compose $F exec -T uwsgi python manage.py company_ldap_sync
@@ -219,6 +226,61 @@ their directory groups on every login, so add directory users to the directory g
 the system setting *Filter string matching* on, a *My team's findings* link for someone in several
 teams matches nothing (that filter takes a single tag); keep the setting off.
 
+## Risk acceptance
+
+Members request, the security team approves. *Request risk acceptance* under the tabs of a finding
+page, or *Request risk acceptance…* in the bulk menu of a findings list or test page (tick findings
+first), opens one page: the findings, a required justification and the duration
+(`DD_COMPANY_RA_DAYS`, default 30, 90 or 180 days; the system setting *Risk acceptance form default
+days* is preselected when it is one of them). Findings that are closed, already accepted, already
+waiting, or on a product with *Enable full risk acceptance* off are listed and left out. The findings
+stay open; each gets a note, and the approvers who can open those products are notified (event
+`company_risk_requested`, which also goes to the escalation mailbox when it is listed in
+`DD_COMPANY_ESCALATION_EVENTS`). The finding page then shows *Pending approval*.
+
+*Risk acceptance* in the sidebar opens the inbox, with the number of requests waiting for an approver:
+
+- *Waiting for my approval* (approvers only): each request opens to its findings with severity and
+  links, then *Approve*, or *Reject* with a reason. Tick several and *Approve selected* to approve in
+  bulk. Nobody decides their own request, and an approver must be able to edit every finding of it.
+- *My requests*: status, decision, note and the risk acceptances an approval created; *Cancel request*
+  while it waits.
+- *Active* and *Expiring in 30 days*: read-only lists of risk acceptances in the products the user can see.
+
+Approving creates one upstream risk acceptance per engagement: owner the requester, *Accepted by* the
+approver, decision *Accept*, the justification as decision details, expiring after the requested days
+(counted from the approval); the findings become risk accepted with upstream's notes and JIRA updates.
+Rejecting keeps the findings open and records the reason on them. The requester is notified either way
+(`company_risk_decided`), and the expiry notices of an acceptance (`risk_acceptance_expiration`) also
+reach its owner. A decided request never changes, so the inbox is the audit trail: who asked, why, for
+how long, who decided and when. The dashboard shows *My risk requests* and, for approvers, *Waiting for
+my approval*.
+
+**Approvers** hold the permission `company.approve_riskacceptancerequest`: members of the Django group
+`risk-approvers` and superusers (staff alone is no approver). With LDAP, `DD_COMPANY_LDAP_RISK_APPROVER_GROUP` (the security
+team's group DN) fills that group on every login and every `company_ldap_sync`; the role is never
+granted through staff, which would also manage every product and user. Local accounts:
+
+```bash
+docker compose $F exec uwsgi python manage.py company_teams --approver sam
+docker compose $F exec uwsgi python manage.py company_teams --no-approver sam
+docker compose $F exec uwsgi python manage.py company_teams list   # last line: the approvers
+```
+
+**Enforcement** (`DD_COMPANY_RA_APPROVAL_REQUIRED=True`, on in the ZainCash profile, off by default).
+For a signed-in user who is no approver, every upstream way to accept risk is refused with a 403, in
+the UI and in API v2: adding a risk acceptance, adding findings to one, changing its decision, *Accepted
+by*, owner, *Reactivate findings on expiration* or its expiry handling, moving its expiry later,
+reinstating an expired one, simple (one-click) acceptance, switching simple acceptance on for a product,
+and copying an engagement that holds risk acceptances (refused before anything is copied). A finding
+they save as risk accepted that was not accepted before is saved open instead: scan import and re-import
+take "risk accepted" from some reports (Threagile, Invicti/Netsparker and others), and copied findings
+and tests keep it. Upstream's *Add Risk Acceptance* links are hidden for them, and its add, edit,
+reinstate and delete pages answer 403. They can still *Expire Now* an acceptance and, in API v2,
+remove findings from one or delete it (on purpose: removing every finding has the same effect): all
+of these make findings active again; editing its name or notes stays open too. The celery expiry job,
+management commands and the JIRA webhook are not affected. The variable needs the full `up -d`.
+
 ## Backup and restore
 
 The production layer runs a `backup` service: every `DD_COMPANY_BACKUP_INTERVAL` seconds
@@ -244,5 +306,6 @@ cannot be decrypted.
 ## Upgrade
 
 Set `DJANGO_VERSION`/`NGINX_VERSION` to the new tag, `docker compose $F pull`, `docker compose $F up -d`.
-The initializer applies migrations on every start. Downgrades are not supported by upstream migrations;
-restore a backup instead.
+The initializer applies migrations on every start, the company app's own included
+(`dojo/company/migrations/`, first `0001_initial`: the risk acceptance requests table). Downgrades are
+not supported by upstream migrations; restore a backup instead.

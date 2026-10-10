@@ -186,6 +186,28 @@ class TestBackend(DojoTestCase):
         self.assertIn("bob", set(product_type.authorized_users.values_list("username", flat=True)))
         self.assertEqual(set(user.groups.values_list("name", flat=True)), {"team:wallet", company_ldap.DIRECTORY})
 
+    @override_settings(COMPANY_LDAP_RISK_APPROVER_GROUP="cn=dojo-security,ou=groups,dc=company,dc=test")
+    def test_login_syncs_the_risk_approver_role_without_staff(self):
+        from dojo.company.ldap_backend import CompanyLDAPBackend  # noqa: PLC0415 -- needs django-auth-ldap
+        from dojo.company.risk_requests import APPROVER_GROUP, is_approver  # noqa: PLC0415
+
+        user = get_user_model().objects.create_user("sam", "sam@company.test")
+
+        class FakeLdapUser:
+            group_names = {"dojo-security"}
+            group_dns = {"cn=dojo-security,ou=groups,dc=company,dc=test"}
+
+        with patch("django_auth_ldap.backend.LDAPBackend.authenticate_ldap_user", return_value=user):
+            CompanyLDAPBackend().authenticate_ldap_user(FakeLdapUser(), "sam123")
+        user = get_user_model().objects.get(pk=user.pk)
+        self.assertIn(APPROVER_GROUP, set(user.groups.values_list("name", flat=True)))
+        self.assertTrue(is_approver(user))
+        self.assertFalse(user.is_staff)
+        FakeLdapUser.group_dns = set()  # left the security team
+        with patch("django_auth_ldap.backend.LDAPBackend.authenticate_ldap_user", return_value=user):
+            CompanyLDAPBackend().authenticate_ldap_user(FakeLdapUser(), "sam123")
+        self.assertFalse(is_approver(get_user_model().objects.get(pk=user.pk)))
+
     def test_directory_account_cannot_claim_a_local_account(self):
         from django_auth_ldap.backend import _LDAPUser  # noqa: PLC0415, PLC2701 -- company image only
 
@@ -306,6 +328,20 @@ class TestLdapSyncCommand(DojoTestCase):
         self.assertEqual(connection.filters[-1], "(uid=*)")
         company_ldap_sync.usernames_for(connection, {DAVE}, "ad")
         self.assertEqual(connection.filters[-1], f"(&(objectCategory=person)(objectClass=user){company_ldap.AD_ENABLED})")
+
+    def test_member_read_includes_the_risk_approver_group(self):
+        import ldap  # noqa: PLC0415
+        from django_auth_ldap.config import LDAPSearch  # noqa: PLC0415
+
+        from dojo.company.management.commands import company_ldap_sync  # noqa: PLC0415
+
+        connection = self.connection()
+        connection.entries[f"cn=dojo-security,{GROUPS}"] = ({"member": [HANK.encode()]}, False)
+        search = LDAPSearch(GROUPS, ldap.SCOPE_SUBTREE, "(objectClass=groupOfNames)")
+        dns = company_ldap_sync.group_member_dns(connection, search, ("dojo-pt-",), f"cn=dojo-admins,{GROUPS}",
+                                                 f"cn=dojo-security,{GROUPS}", f"cn=missing,{GROUPS}", "")
+        self.assertIn(HANK, dns)
+        self.assertIn(ADMIN, dns)
 
     def run_sync(self, out, err=None, *, found=True):
         """

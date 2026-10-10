@@ -12,6 +12,12 @@
             {% include "company/_work_tile.html" with tile=company_work.team color="green" icon="fa-users" label=_("My team's open findings") testid="company-tile-team" %}
         {% endif %}
         {% include "company/_work_tile.html" with tile=company_work.overdue color="red" icon="fa-clock" label=_("My overdue") testid="company-tile-overdue" %}
+        {# risk acceptance requests (dojo/company/risk_requests.py tiles): pending ones of the user and, for approvers, those waiting for them #}
+        {% company_risk_tiles request.user as company_risk %}
+        {% include "company/_work_tile.html" with tile=company_risk.mine color="yellow" icon="fa-hourglass-half" label=_("My risk requests") testid="company-tile-risk-mine" %}
+        {% if company_risk.waiting %}
+            {% include "company/_work_tile.html" with tile=company_risk.waiting color="yellow" icon="fa-scale-balanced" label=_("Waiting for my approval") testid="company-tile-risk-waiting" %}
+        {% endif %}
     </div>
     {{ block.super }}
 {% endblock %}

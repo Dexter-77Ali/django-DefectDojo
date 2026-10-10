@@ -14,10 +14,10 @@
     }
   }
 
-  // "Assign…" in the findings bulk menu. The form comes from <template id="company-bulk"> (company base.html,
-  // block modals). Only where form#bulk_change_form posts to a findings bulk URL: the finding page has an
-  // endpoint bulk menu with the same ids, which must not get it.
-  function addBulkAssign() {
+  // "Assign…" and "Request risk acceptance…" in the findings bulk menu. The forms come from
+  // <template id="company-bulk"> (company base.html, block modals). Only where form#bulk_change_form posts to a
+  // findings bulk URL: the finding page has an endpoint bulk menu with the same ids, which must not get them.
+  function addBulkForms() {
     var template = document.getElementById("company-bulk");
     var bulkForm = document.querySelector("form#bulk_change_form");
     var menu = document.getElementById("bulk_edit_menu");
@@ -29,31 +29,32 @@
     var findingsBulk = targets.some(function (url) {
       return url && samePath(action, url);
     });
-    var assign = template.content.querySelector("form");
-    if (!findingsBulk || !assign) {
+    if (!findingsBulk) {
       return;
     }
-    assign = assign.cloneNode(true);
-    assign.addEventListener("submit", function () {
-      // the same selection upstream's bulk edit submits (findings_list_snippet.html, view_test.html)
-      Array.prototype.forEach.call(assign.querySelectorAll("input[name=finding_to_update]"), function (old) {
-        old.parentNode.removeChild(old); // left over when the page comes back from the browser cache
+    Array.prototype.forEach.call(template.content.querySelectorAll("form"), function (source) {
+      var form = source.cloneNode(true);
+      form.addEventListener("submit", function () {
+        // the same selection upstream's bulk edit submits (findings_list_snippet.html, view_test.html)
+        Array.prototype.forEach.call(form.querySelectorAll("input[name=finding_to_update]"), function (old) {
+          old.parentNode.removeChild(old); // left over when the page comes back from the browser cache
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("input[type=checkbox].select_one:checked"), function (box) {
+          if (/^\d+$/.test(box.id)) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "finding_to_update";
+            input.value = box.id;
+            form.appendChild(input);
+          }
+        });
       });
-      Array.prototype.forEach.call(document.querySelectorAll("input[type=checkbox].select_one:checked"), function (box) {
-        if (/^\d+$/.test(box.id)) {
-          var input = document.createElement("input");
-          input.type = "hidden";
-          input.name = "finding_to_update";
-          input.value = box.id;
-          assign.appendChild(input);
-        }
-      });
+      menu.appendChild(form);
     });
-    menu.appendChild(assign);
   }
 
   try {
-    addBulkAssign();
+    addBulkForms();
   } catch (e) {
     if (window.console && console.warn) {
       console.warn("company.js:", e);

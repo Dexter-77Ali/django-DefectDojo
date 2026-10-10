@@ -20,6 +20,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 import dojo
+from dojo.authorization.authorization import user_has_configuration_permission
+from dojo.authorization.middleware import AuthorizationMiddleware
 from dojo.authorization.url_permissions import URL_PERMISSIONS
 from dojo.filters import DojoFilter, FindingSLAFilter, FindingTagFilter
 from dojo.finding.helper import OPEN_FINDINGS_QUERY
@@ -29,9 +31,11 @@ from dojo.importers.auto_create_context import AutoCreateContextManager
 from dojo.importers.options import ImporterOptions
 from dojo.importers.services import ImportResult, auto_import_scan
 from dojo.jira import services as jira_services
-from dojo.models import Dojo_User, Engagement, Finding, JIRA_Project, Notes, Test, Test_Type
+from dojo.models import Dojo_User, Engagement, Finding, JIRA_Project, Notes, Product, Risk_Acceptance, Test, Test_Type
 from dojo.notifications.helper import NotificationManager, create_notification
 from dojo.risk_acceptance import helper as ra_helper
+from dojo.risk_acceptance.api.serializer import RiskAcceptanceSerializer
+from dojo.risk_acceptance.queries import get_authorized_risk_acceptances
 from dojo.tags.utils import bulk_add_tags_to_instances, bulk_remove_tags_from_instances
 from dojo.utils import get_return_url, grade_debounce_cache_key, redirect_to_return_url_or_else
 from unittests.dojo_test_case import DojoTestCase, get_unit_tests_scans_path, versioned_fixtures
@@ -89,8 +93,9 @@ URL_NAMES = {
 }
 
 # Blocks of upstream dojo/templates/base.html that company/base.html overrides now (header_logo,
-# sidebar-items, support-tab, dojo_css, footer, tab_bar: upload and assign actions, modals: the bulk
-# "Assign…" form, extra_javascript: company.js) or a later phase will (settings-dropdown-items: language switch).
+# sidebar-items, support-tab, dojo_css, footer, tab_bar: upload, assign and risk request actions, modals: the bulk
+# "Assign…" and "Request risk acceptance…" forms, extra_javascript: company.js) or a later phase will
+# (settings-dropdown-items: language switch).
 BASE_BLOCKS = {
     "header_logo", "sidebar-items", "support-tab", "dojo_css", "footer",
     "tab_bar", "modals", "extra_javascript", "settings-dropdown-items",
@@ -147,11 +152,70 @@ class TestUpstreamContract(DojoTestCase):
             "reinstate": {"risk_acceptance", "old_expiration_date", "user"},
             "expire_now": {"risk_acceptance", "user"},
             "default_expiration_date": set(),
+            "expiration_days": set(),
+            "get_view_risk_acceptance": {"risk_acceptance"},
+            "simple_risk_accept": {"user", "finding"},
         }
         for name, parameters in expected.items():
             with self.subTest(name=name):
                 function = getattr(ra_helper, name)
                 self.assertLessEqual(parameters, set(inspect.signature(function).parameters))
+
+    def test_risk_acceptance_enforcement_hooks(self):
+        # Phase 4 enforcement (dojo/company/signals.py) wraps these helpers in ra_helper; the wrapper reaches only
+        # callers that look them up on the module, so no upstream module may import them by name
+        guarded = {"add_findings_to_risk_acceptance", "simple_risk_accept", "reinstate", "expire_now"}
+        for name in guarded:
+            self.assertTrue(getattr(getattr(ra_helper, name), "company_guarded", False), name)
+        root = Path(dojo.__file__).parent
+        for path in root.rglob("*.py"):
+            if "company" in path.relative_to(root).parts:
+                continue
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if "from dojo.risk_acceptance.helper import" in line:
+                    imported = {name.strip() for name in line.split("import", 1)[1].split("#")[0].strip(" ()").split(",")}
+                    self.assertFalse(imported & guarded, f"{path}: {line}")
+        # why the helpers are wrapped instead of guarded at the M2M only: they change findings before saving
+        add = inspect.getsource(inspect.unwrap(ra_helper.add_findings_to_risk_acceptance))
+        self.assertLess(add.index("finding.save("), add.index("risk_acceptance.accepted_findings.add(finding)"))
+        reinstate = inspect.getsource(inspect.unwrap(ra_helper.reinstate))
+        self.assertIn("if risk_acceptance.expiration_date_handled:", reinstate)  # the guard's condition
+        # the API PATCH saves, then calls the helper even with no findings to add (the guard lets that through)
+        update = inspect.getsource(RiskAcceptanceSerializer.update)
+        self.assertLess(update.index("super().update("), update.index("ra_helper.add_findings_to_risk_acceptance("))
+        # Engagement.copy (wrapped too) copies tests and findings before the risk acceptances
+        self.assertTrue(getattr(Engagement.copy, "company_guarded", False))
+        copy = inspect.getsource(inspect.unwrap(Engagement.copy))
+        self.assertLess(copy.index("test.copy("), copy.index("risk_acceptance.copy("))
+        # the fields the pre_save guard compares, the approval writes and the inbox lists
+        fields = {field.name for field in Risk_Acceptance._meta.get_fields()}
+        self.assertLessEqual({"reactivate_expired", "decision", "decision_details", "accepted_by", "owner", "expiration_date",
+                              "expiration_date_handled", "accepted_findings", "engagement", "name"}, fields)
+        self.assertEqual(Risk_Acceptance.TREATMENT_ACCEPT, "A")
+        self.assertEqual(Engagement._meta.get_field("risk_acceptance").related_model, Risk_Acceptance)
+        self.assertLessEqual({"enable_full_risk_acceptance", "enable_simple_risk_acceptance"},
+                             {field.name for field in Product._meta.get_fields()})
+        # the friendlier URL check ("config", the approver permission): superuser, staff, then Django permissions; inbox scope
+        self.assertIn("user.has_perm(permission)", inspect.getsource(user_has_configuration_permission))
+        queries = (Path(dojo.__file__).parent / "risk_acceptance" / "queries.py").read_text(encoding="utf-8")  # cache wrapper hides the signature
+        self.assertIn("def get_authorized_risk_acceptances(permission):", queries)
+        self.assertTrue(callable(get_authorized_risk_acceptances))
+        # the hidden "Add Risk Acceptance" links match this path (company base.html, company-ra-restricted)
+        for args in ((1,), (1, 1)):
+            self.assertIn("/risk_acceptance/add", reverse("add_risk_acceptance", args=args))
+
+    def test_risk_acceptance_notifications(self):
+        # Phase 4: company events have no Notifications column; upstream then uses the "other" row and template
+        self.assertIn("getattr(notifications, event, notifications.other)", inspect.getsource(NotificationManager._process_notifications))
+        self.assertIn('f"notifications/{notification_type}/other.tpl"', inspect.getsource(NotificationManager._create_notification_message))
+        self.assertIn("company_risk_requested", settings.NOTIFICATIONS_SYSTEM_LEVEL_TRUMP)
+        self.assertIn("company_risk_decided", settings.NOTIFICATIONS_SYSTEM_LEVEL_TRUMP)
+        # an empty recipients list sends nothing (the escalation copy still goes out), never a broadcast
+        self.assertIn("if not recipients:", inspect.getsource(NotificationManager.create_notification))
+        # the owner copy of risk_acceptance_expiration reads the risk_acceptance keyword and upstream's recipient query
+        for function in (ra_helper.expire_now, ra_helper.expiration_handler):
+            self.assertIn("risk_acceptance=risk_acceptance", inspect.getsource(inspect.unwrap(function)))
+        self.assertTrue(callable(NotificationManager._get_user_to_send_notifications_to))
 
     def test_assign_building_blocks(self):
         # Phase 3 assign view: authorization filter, return_url helpers, tag utilities, notifications
@@ -194,10 +258,12 @@ class TestUpstreamContract(DojoTestCase):
             self.assertIn('name="finding_to_update"', html)
 
     def test_risk_acceptance_url_permissions(self):
-        # Phase 4 enforcement adds the approver permission to these entries when it is switched on
+        # Phase 4 enforcement appends the approver permission to these entries (lists) when it is switched on
         for name in ("add_risk_acceptance", "view_risk_acceptance", "edit_risk_acceptance", "expire_risk_acceptance",
                      "reinstate_risk_acceptance", "delete_risk_acceptance", "simple_risk_accept_finding"):
             self.assertIn(name, URL_PERMISSIONS, name)
+            self.assertIsInstance(URL_PERMISSIONS[name], list)
+        self.assertIn('check_type == "config"', inspect.getsource(AuthorizationMiddleware.process_view))
 
 
 @versioned_fixtures

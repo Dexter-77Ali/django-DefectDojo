@@ -18,11 +18,15 @@ Off unless DD_COMPANY_LDAP_ENABLED=True. dojo/settings/local_settings.py then ca
     DD_COMPANY_LDAP_TEAM_GROUP_PREFIX   groups named <prefix><team> put the user in the
                                    Django group team:<team> (default dojo-team-), which
                                    findings are assigned to (dojo/company/teams.py)
+    DD_COMPANY_LDAP_RISK_APPROVER_GROUP   group DN (the security team) whose members are put in
+                                   the Django group risk-approvers, who approve risk acceptance
+                                   requests (dojo/company/risk_requests.py); never staff
 
 Role model of open-source 3.x: superuser, staff (read/write everywhere) and per
 product / product-type authorized users. The directory is authoritative for LDAP
 users: on every login (and on every `manage.py company_ldap_sync`) their
-product-type memberships and teams are set to exactly the groups they carry.
+product-type memberships, teams and (when the group is set) approver role are set to
+exactly the groups they carry.
 The sync also rechecks directory users outside every group (they lose that access)
 and deactivates those no longer in the directory (deleted, or disabled in AD).
 The local ModelBackend stays last so the admin account and API token login keep
@@ -83,6 +87,7 @@ def configure(target: dict, env) -> None:
         "AUTH_LDAP_MIRROR_GROUPS": False,
         "COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX": env("DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX", default=DEFAULT_PREFIX),
         "COMPANY_LDAP_TEAM_GROUP_PREFIX": env("DD_COMPANY_LDAP_TEAM_GROUP_PREFIX", default=DEFAULT_TEAM_PREFIX),
+        "COMPANY_LDAP_RISK_APPROVER_GROUP": env("DD_COMPANY_LDAP_RISK_APPROVER_GROUP", default=""),
         "COMPANY_LDAP_PROFILE": profile,  # read by manage.py company_ldap_sync to map member DNs to usernames
     })
     admin_group = env("DD_COMPANY_LDAP_ADMIN_GROUP", default="")
@@ -153,3 +158,25 @@ def sync_team_membership(user, group_names, prefix: str | None = None) -> set[st
     teams = {name[len(TEAM):] for name in wanted}
     logger.info("company ldap: %s is in teams %s", user.username, sorted(teams) or "none")
     return teams
+
+
+def sync_risk_approver(user, ldap_user) -> bool | None:
+    """
+    Put the user in the Django group risk-approvers exactly when they are in DD_COMPANY_LDAP_RISK_APPROVER_GROUP.
+    Nothing happens without that setting (approvers are then managed with manage.py company_teams --approver).
+    Never touches is_staff: staff would also manage every product and user. Returns the membership, or None.
+    """
+    group_dn = getattr(settings, "COMPANY_LDAP_RISK_APPROVER_GROUP", "")
+    if not group_dn:
+        return None
+    from dojo.company.risk_requests import approver_group  # noqa: PLC0415 -- see the module-level note
+
+    # group_dns comes from the same cached group search as group_names; DNs compare without case
+    member = group_dn.lower() in {dn.lower() for dn in ldap_user.group_dns}
+    group = approver_group()
+    if member:
+        user.groups.add(group)
+    else:
+        user.groups.remove(group)
+    logger.info("company ldap: %s is %sa risk approver", user.username, "" if member else "not ")
+    return member

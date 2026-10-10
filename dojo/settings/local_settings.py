@@ -46,6 +46,10 @@ COMPANY_FIELDS = _company_json("DD_COMPANY_FIELDS", None)
 COMPANY_UPLOAD_ENGAGEMENT_NAME = env("DD_COMPANY_UPLOAD_ENGAGEMENT_NAME", default="Security scans")  # noqa: F821
 # Scanner allowlist applied by `manage.py company_scan_types` (comma separated scan types); empty = every scanner.
 COMPANY_SCAN_TYPES = env.list("DD_COMPANY_SCAN_TYPES", default=[])  # noqa: F821
+# Durations a risk acceptance can be requested for (dojo/company/risk_requests.py), comma separated days.
+COMPANY_RA_DAYS = [int(days) for days in env.list("DD_COMPANY_RA_DAYS", default=[]) if days.strip()] or [30, 90, 180]  # noqa: F821
+# Only approvers (the security team) accept risk; everyone else requests it (dojo/company/signals.py). Off in code.
+COMPANY_RA_APPROVAL_REQUIRED = env.bool("DD_COMPANY_RA_APPROVAL_REQUIRED", default=False)  # noqa: F821
 
 # --- upstream hooks (dotted paths read through dojo.utils.get_custom_method) -----
 # Asserted importable by dojo.company.apps.CompanyConfig.ready(); a typo here
@@ -65,8 +69,10 @@ if COMPANY_LDAP_ENABLED:
 NOTIFICATION_MANAGER = "dojo.company.notifications.CompanyNotificationManager"
 # Assignments (dojo/company/teams.py) reach the assignee on the system channels too, like upstream's review requests.
 NOTIFICATIONS_SYSTEM_LEVEL_TRUMP += ["company_finding_assigned"]  # noqa: F821 -- set by dojo.notifications.settings
+# Risk acceptance requests and decisions (dojo/company/risk_requests.py), likewise.
+NOTIFICATIONS_SYSTEM_LEVEL_TRUMP += ["company_risk_requested", "company_risk_decided"]
 COMPANY_ESCALATION_EMAILS = env.list("DD_COMPANY_ESCALATION_EMAILS", default=[])  # noqa: F821
 COMPANY_ESCALATION_EVENTS = env.list(  # noqa: F821
     "DD_COMPANY_ESCALATION_EVENTS",
-    default=["sla_breach", "sla_breach_combined", "risk_acceptance_expiration"],
+    default=["sla_breach", "sla_breach_combined", "risk_acceptance_expiration", "company_risk_requested"],
 )

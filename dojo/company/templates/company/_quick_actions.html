@@ -46,6 +46,22 @@
                     </button>
                 {% endif %}
             </form>
+            {% url 'company_risk_request' as company_risk_request_url %}
+            {% if company_risk_request_url %}
+                {# open, not accepted findings of products with full risk acceptance on; a waiting request shows instead #}
+                {% company_risk_finding finding as company_risk %}
+                {% if company_risk.pending or company_risk.can_request %}
+                    <div class="company-quick-actions" data-testid="company-risk-finding">
+                        {% if company_risk.pending %}
+                            <span class="label label-warning company-risk-pending" data-testid="company-risk-pending">{% trans "Pending approval" %}</span>
+                        {% else %}
+                            <a class="btn btn-default btn-sm" href="{{ company_risk_request_url }}?finding={{ finding.id }}&amp;return_url={{ request.get_full_path|urlencode }}" data-testid="company-risk-request">
+                                <i class="fa-solid fa-scale-balanced"></i> {% trans "Request risk acceptance" %}
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
         {% endif %}
     {% endif %}
 {% endwith %}

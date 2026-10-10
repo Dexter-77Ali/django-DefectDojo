@@ -10,10 +10,12 @@ from django import forms
 from django.conf import settings
 from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 
 from dojo.importers.auto_create_context import AutoCreateContextManager
 from dojo.models import Product, Test
 from dojo.product.queries import get_authorized_products
+from dojo.risk_acceptance.helper import expiration_days
 from dojo.tools.factory import get_choices_sorted, requires_file
 from dojo.utils import is_scan_file_too_large
 from dojo.validators import ImporterFileExtensionValidator
@@ -142,3 +144,23 @@ class QuickUploadForm(forms.Form):
         if file and is_scan_file_too_large(file):
             self.add_error("file", _("Report file is too large. Maximum supported size is %d MB") % settings.SCAN_FILE_MAX_SIZE)
         return cleaned
+
+
+class RiskRequestForm(forms.Form):
+
+    """Risk acceptance request (company/risk/request, dojo.company.views.risk_request): a justification and a duration."""
+
+    justification = forms.CharField(
+        label=_("Justification"),
+        max_length=5000,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 5}),
+        help_text=_("Why the risk can be accepted: compensating controls, the planned fix and its date, the business reason."),
+    )
+    days = forms.TypedChoiceField(label=_("Accept for"), coerce=int, widget=forms.Select(attrs={"class": "form-control"}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        days = settings.COMPANY_RA_DAYS
+        self.fields["days"].choices = [(value, ngettext("%(days)d day", "%(days)d days", value) % {"days": value}) for value in days]
+        default = expiration_days()
+        self.fields["days"].initial = default if default in days else days[0]

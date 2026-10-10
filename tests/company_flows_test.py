@@ -80,6 +80,29 @@ class CompanyFlowsTest(BaseTestCase):
         driver.find_element(By.CSS_SELECTOR, '#dd-sidebar a[data-testid="company-nav-team-findings"]').click()
         self.assertEqual(self.listed_finding_ids(), chosen)
 
+    @on_exception_html_source_logger
+    def test_request_risk_acceptance(self):
+        # Phase 4: "Request risk acceptance" on a finding page, then the request in the inbox. Nobody approves their
+        # own request and the suite runs as admin only, so the request waits: "My requests" lists it, the approver tab
+        # does not (the approve flow is covered by unittests/company/test_risk_requests.py).
+        driver = self.driver
+        driver.get(self.base_url + "finding/open")
+        finding_id = min(self.listed_finding_ids(), key=int)
+        driver.get(self.base_url + f"finding/{finding_id}")
+        driver.find_element(By.CSS_SELECTOR, 'a[data-testid="company-risk-request"]').click()
+        driver.find_element(By.ID, "id_justification").send_keys("Compensating control: WAF rule 1234")
+        Select(driver.find_element(By.ID, "id_days")).select_by_value("30")
+        driver.find_element(By.CSS_SELECTOR, 'button[data-testid="company-risk-submit"]').click()
+        self.assertTrue(self.is_success_message_present(text="Requested risk acceptance of 1 finding"))
+        self.assertTrue(driver.current_url.rstrip("/").endswith(f"/finding/{finding_id}"))
+        self.assertTrue(driver.find_element(By.CSS_SELECTOR, '[data-testid="company-risk-pending"]').is_displayed())
+
+        driver.find_element(By.CSS_SELECTOR, '#dd-sidebar a[data-testid="company-nav-risk"]').click()
+        self.assertTrue(self.is_text_present_on_page(text="No request is waiting for you."))
+        driver.find_element(By.CSS_SELECTOR, 'a[data-testid="company-risk-tab-mine"]').click()
+        row = driver.find_element(By.CSS_SELECTOR, '[data-testid^="company-risk-mine-"]')
+        self.assertIn("Waiting for approval", row.text)
+
 
 def suite():
     suite = unittest.TestSuite()
@@ -88,6 +111,7 @@ def suite():
     suite.addTest(ProductTest("test_create_product"))
     suite.addTest(CompanyFlowsTest("test_quick_upload"))
     suite.addTest(CompanyFlowsTest("test_bulk_assign"))
+    suite.addTest(CompanyFlowsTest("test_request_risk_acceptance"))
     suite.addTest(ProductTest("test_delete_product"))
     return suite
 

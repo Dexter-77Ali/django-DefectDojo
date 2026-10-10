@@ -60,18 +60,23 @@ def assignment(finding) -> tuple[str | None, str | None]:
     return team, person
 
 
+def members_of_every_product(product_ids) -> set[int]:
+    """Ids of the users who are members of every one of the products, directly or through the product type. Two queries."""
+    per_product = {product_id: set() for product_id in product_ids}
+    for field in ("authorized_users", "prod_type__authorized_users"):
+        for product_id, user_id in Product.objects.filter(id__in=list(per_product)).values_list("id", field):
+            if user_id is not None:
+                per_product[product_id].add(user_id)
+    return set.intersection(*per_product.values()) if per_product else set()
+
+
 def assignable_teams(findings) -> dict[str, list]:
     """
     Every team, with the members who may be given all these findings: active, and superuser, staff, or a
     member of every affected product (directly or through its product type). Not upstream's
     get_authorized_users_for_product_and_product_type, which returns every user to a staff requester.
     """
-    per_product = {finding.test.engagement.product_id: set() for finding in findings}
-    for field in ("authorized_users", "prod_type__authorized_users"):
-        for product_id, user_id in Product.objects.filter(id__in=list(per_product)).values_list("id", field):
-            if user_id is not None:
-                per_product[product_id].add(user_id)
-    members_of_all = set.intersection(*per_product.values()) if per_product else set()
+    members_of_all = members_of_every_product({finding.test.engagement.product_id for finding in findings})
     teams = {
         name[len(TEAM):]: []
         for name in Group.objects.filter(name__startswith=TEAM).order_by("name").values_list("name", flat=True)
@@ -100,17 +105,23 @@ def assign(findings, team: str, person, by) -> None:
         entry = _("Assigned to %(team)s / %(person)s by %(user)s") % {"team": team, "person": person, "user": who}
     else:
         entry = _("Assigned to %(team)s by %(user)s") % {"team": team, "user": who}
-    now = timezone.now()
     with transaction.atomic(), pghistory.context(source="company_assign"):
         if stale:
             bulk_remove_tags_from_instances(sorted(stale), findings)
         bulk_add_tags_to_instances(wanted, findings)
-        # The same relation upstream fills with finding.notes.add(note) (nothing listens to it), in two
-        # queries instead of two per finding. Public notes: they are the audit trail of the assignment.
-        notes = Notes.objects.bulk_create([Notes(entry=entry, author=by, date=now) for _finding in findings])
-        Finding.notes.through.objects.bulk_create(
-            [Finding.notes.through(finding=finding, notes=note) for finding, note in zip(findings, notes, strict=True)],
-        )
+        add_notes(findings, entry, by)
+
+
+def add_notes(findings, entry: str, author) -> None:
+    """
+    One public note per finding (the audit trail of assignments and risk requests). The same relation upstream
+    fills with finding.notes.add(note) (nothing listens to it), in two queries instead of two per finding.
+    """
+    now = timezone.now()
+    notes = Notes.objects.bulk_create([Notes(entry=entry, author=author, date=now) for _finding in findings])
+    Finding.notes.through.objects.bulk_create(
+        [Finding.notes.through(finding=finding, notes=note) for finding, note in zip(findings, notes, strict=True)],
+    )
 
 
 def notify(count: int, team: str, person, members, by) -> None:

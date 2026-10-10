@@ -34,6 +34,16 @@
         </a>
     {% endif %}
 {% endif %}
+{% url 'company_risk_inbox' as company_risk_url %}
+{% if company_risk_url and request.user.is_authenticated %}
+    {# the count is shown, and its query runs, for risk approvers only (dojo/company/risk_requests.py pending_count) #}
+    {% company_risk_pending request.user as company_risk_waiting %}
+    <a href="{{ company_risk_url }}" data-testid="company-nav-risk" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        <i class="fa-solid fa-scale-balanced w-5 text-center flex-shrink-0"></i>
+        <span class="truncate">{% trans "Risk acceptance" %}</span>
+        {% if company_risk_waiting %}<span class="company-nav-count" data-testid="company-nav-risk-count" title="{% trans 'Waiting for my approval' %}">{{ company_risk_waiting }}</span>{% endif %}
+    </a>
+{% endif %}
 {% url 'report_builder' as company_reports_url %}
 {% if company_reports_url %}
     <a href="{{ company_reports_url }}" data-testid="company-nav-reports" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">

@@ -3,12 +3,12 @@
 from django.contrib.auth.models import Group
 from django_auth_ldap.backend import LDAPBackend
 
-from dojo.company.ldap import DIRECTORY, sync_product_type_access, sync_team_membership
+from dojo.company.ldap import DIRECTORY, sync_product_type_access, sync_risk_approver, sync_team_membership
 
 
 class CompanyLDAPBackend(LDAPBackend):
 
-    """django-auth-ldap backend that keeps local accounts local and syncs product-type access and teams from groups."""
+    """django-auth-ldap backend that keeps local accounts local and syncs product-type access, teams and approvers from groups."""
 
     def get_or_build_user(self, username, ldap_user):
         user, built = super().get_or_build_user(username, ldap_user)
@@ -33,16 +33,19 @@ class CompanyLDAPBackend(LDAPBackend):
         if user is None or not user.is_active:
             # also closes /api/v2/api-token-auth/, which relies on authenticate() refusing inactive users
             return None
-        sync_directory_access(user, ldap_user.group_names)
+        sync_directory_access(user, ldap_user)
         return user
 
 
-def sync_directory_access(user, group_names):
+def sync_directory_access(user, ldap_user):
     """
-    Everything the directory decides besides django-auth-ldap's own fields: product types, then teams.
-    Shared by login and manage.py company_ldap_sync, so any later directory-driven role syncs here too.
-    Also marks the user as a directory user (group DIRECTORY) for the leaver check of that command.
-    Returns (product type names, team names).
+    Everything the directory decides besides django-auth-ldap's own fields: product types, teams and the risk
+    approver role (when DD_COMPANY_LDAP_RISK_APPROVER_GROUP is set). Shared by login and manage.py
+    company_ldap_sync, so any later directory-driven role syncs here too. Also marks the user as a directory
+    user (group DIRECTORY) for the leaver check of that command. Returns (product type names, team names).
     """
     user.groups.add(Group.objects.get_or_create(name=DIRECTORY)[0])
-    return sync_product_type_access(user, group_names), sync_team_membership(user, group_names)
+    group_names = ldap_user.group_names
+    product_types, teams = sync_product_type_access(user, group_names), sync_team_membership(user, group_names)
+    sync_risk_approver(user, ldap_user)
+    return product_types, teams

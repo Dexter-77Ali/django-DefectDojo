@@ -18,6 +18,9 @@ __all__ = ["company_patterns", "handler400", "handler403", "handler500", "urlpat
 company_patterns = [
     re_path(r"^upload$", views.quick_upload, name="company_quick_upload"),
     re_path(r"^assign$", views.assign, name="company_assign"),
+    re_path(r"^risk$", views.risk_inbox, name="company_risk_inbox"),
+    re_path(r"^risk/request$", views.risk_request, name="company_risk_request"),
+    re_path(r"^risk/decide$", views.risk_decide, name="company_risk_decide"),
 ]
 
 urlpatterns = [

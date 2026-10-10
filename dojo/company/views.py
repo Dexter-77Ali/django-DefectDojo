@@ -4,30 +4,36 @@ company: views served under <url_prefix>company/ (dojo/company/urls.py).
 Every view checks authorization itself, against dojo objects, with the upstream helpers.
 """
 import logging
+from datetime import timedelta
 
 import pghistory
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Count, F, Prefetch
 from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from dojo.authorization.authorization import user_has_permission_or_403
-from dojo.company import teams
-from dojo.company.forms import NO_COMPONENT, QuickUploadForm, upload_engagement
+from dojo.company import risk_requests, teams
+from dojo.company.forms import NO_COMPONENT, QuickUploadForm, RiskRequestForm, upload_engagement
+from dojo.company.models import RiskAcceptanceRequest
 from dojo.finding.queries import get_authorized_findings_for_queryset
 from dojo.importers.services import auto_import_scan
 from dojo.jira import services as jira_services
 from dojo.models import Finding, Product, Test
+from dojo.risk_acceptance.queries import get_authorized_risk_acceptances
 from dojo.utils import (
     Product_Tab,
     add_breadcrumb,
+    get_page_items,
     get_return_url,
     get_system_setting,
     redirect_to_return_url_or_else,
@@ -42,6 +48,26 @@ def _object_or_404(model, raw_id):
     if not (raw_id.isascii() and raw_id.isdigit()):  # isdigit alone accepts "²", which int() rejects
         raise Http404
     return get_object_or_404(model, pk=raw_id)
+
+
+def _return_url(request):
+    """The posted or queried return_url, "" without one, None when it leaves this site (upstream's redirect() then raises, a 500)."""
+    return_url = (get_return_url(request) or "").strip()
+    if return_url and not url_has_allowed_host_and_scheme(return_url, allowed_hosts=None):
+        return None
+    return return_url
+
+
+def _editable_findings(request, raw_ids):
+    """The findings of the ids, by severity; PermissionDenied unless the user may edit every one (nothing changes then)."""
+    ids = {int(value) for value in raw_ids if value.isascii() and value.isdigit()}
+    findings = list(
+        get_authorized_findings_for_queryset("edit", Finding.objects.filter(id__in=ids), user=request.user)
+        .select_related("test__engagement__product").prefetch_related("tags").order_by("numerical_severity", "id"),
+    )
+    if len(findings) != len(set(raw_ids)):  # a finding the user may not edit, a missing one or a forged id
+        raise PermissionDenied
+    return findings
 
 
 def _push_to_jira(target):
@@ -173,22 +199,15 @@ def assign(request):
     the finding page) it saves and returns to return_url. Every finding must be editable by the user,
     otherwise 403 and nothing changes.
     """
-    return_url = (get_return_url(request) or "").strip()
-    if return_url and not url_has_allowed_host_and_scheme(return_url, allowed_hosts=None):
-        # upstream's redirect() raises (a 500) on a foreign return_url; refuse before anything changes
+    return_url = _return_url(request)
+    if return_url is None:
         return HttpResponseBadRequest(_("return_url must stay on this site"))
     raw_ids = request.POST.getlist("finding_to_update")
     if not raw_ids or len(raw_ids) > teams.MAX_FINDINGS:
         messages.warning(request, _("Select between 1 and %(max)d findings to assign.") % {"max": teams.MAX_FINDINGS},
                          extra_tags="alert-warning")
         return redirect_to_return_url_or_else(request, reverse("open_findings"))
-    ids = {int(value) for value in raw_ids if value.isascii() and value.isdigit()}
-    findings = list(
-        get_authorized_findings_for_queryset("edit", Finding.objects.filter(id__in=ids), user=request.user)
-        .select_related("test__engagement__product").prefetch_related("tags").order_by("numerical_severity", "id"),
-    )
-    if len(findings) != len(set(raw_ids)):  # a finding the user may not edit, a missing one or a forged id
-        raise PermissionDenied
+    findings = _editable_findings(request, raw_ids)
 
     choices = teams.assignable_teams(findings)
     team = request.POST.get("team", "")
@@ -218,3 +237,151 @@ def assign(request):
         "error": error,
         "return_url": return_url or reverse("open_findings"),
     })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def risk_request(request):
+    """
+    Ask the security team to accept the risk of findings for a number of days: GET ?finding=<id> (the finding
+    page), or POST finding_to_update (the bulk "Request risk acceptance…" button, which shows this page; the page
+    posts again with the justification). Every finding must be editable by the user, otherwise 403 and nothing
+    changes. Findings that cannot be requested are listed with the reason and left out.
+    """
+    return_url = _return_url(request)
+    if return_url is None:
+        return HttpResponseBadRequest(_("return_url must stay on this site"))
+    raw_ids = request.POST.getlist("finding_to_update") if request.method == "POST" else request.GET.getlist("finding")
+    if not raw_ids or len(raw_ids) > risk_requests.MAX_FINDINGS:
+        messages.warning(request, _("Select between 1 and %(max)d findings to request risk acceptance for.") % {
+            "max": risk_requests.MAX_FINDINGS}, extra_tags="alert-warning")
+        return redirect_to_return_url_or_else(request, reverse("open_findings"))
+    findings = _editable_findings(request, raw_ids)
+    eligible, skipped = risk_requests.split_eligible(findings)
+    submitted = request.method == "POST" and "justification" in request.POST
+    form = RiskRequestForm(request.POST if submitted else None)
+    if submitted and eligible and form.is_valid():
+        with pghistory.context(source="company_risk_request"):
+            created = risk_requests.create(eligible, request.user, form.cleaned_data["justification"], form.cleaned_data["days"])
+        if created is not None:
+            done = ngettext("Requested risk acceptance of %(count)d finding. The security team has been notified.",
+                            "Requested risk acceptance of %(count)d findings. The security team has been notified.",
+                            len(eligible))
+            messages.success(request, done % {"count": len(eligible)}, extra_tags="alert-success")
+            return redirect_to_return_url_or_else(request, reverse("company_risk_inbox") + "?tab=mine")
+
+    add_breadcrumb(title=_("Request risk acceptance"), top_level=True, request=request)
+    return render(request, "company/risk_request.html", {
+        "form": form,
+        "eligible": eligible,
+        "skipped": skipped,
+        "return_url": return_url or (reverse("view_finding", args=(findings[0].id,)) if len(findings) == 1 else reverse("open_findings")),
+    })
+
+
+INBOX_TABS = ("waiting", "mine", "active", "expiring")
+EXPIRING_DAYS = 30
+
+
+@login_required
+@require_GET
+def risk_inbox(request):
+    """
+    Risk acceptance in four tabs: requests waiting for the approver (approvers only), the user's own requests,
+    and active and soon expiring risk acceptances (read-only, scoped by upstream's get_authorized_risk_acceptances).
+    """
+    user = request.user
+    tabs = [tab for tab in INBOX_TABS if tab != "waiting" or risk_requests.is_approver(user)]
+    tab = request.GET.get("tab") if request.GET.get("tab") in tabs else tabs[0]
+    findings = Prefetch("findings", queryset=Finding.objects.select_related("test__engagement__product").order_by("numerical_severity", "id"))
+    if tab == "waiting":
+        items = risk_requests.waiting_for(user).select_related("requested_by").prefetch_related(findings).order_by("created", "id")
+    elif tab == "mine":
+        # only the findings the requester can still open (access may have changed since the request)
+        visible = Prefetch("findings", queryset=get_authorized_findings_for_queryset("view", findings.queryset, user=user))
+        items = (RiskAcceptanceRequest.objects.filter(requested_by=user).select_related("decided_by")
+                 .prefetch_related(visible, "risk_acceptances__engagement_set").order_by("-created", "-id"))
+    else:
+        items = (get_authorized_risk_acceptances("view").filter(expiration_date_handled__isnull=True)
+                 .select_related("owner").prefetch_related("engagement_set__product")
+                 .annotate(finding_count=Count("accepted_findings", distinct=True)))
+        if tab == "expiring":
+            items = items.filter(expiration_date__isnull=False, expiration_date__lte=timezone.now() + timedelta(days=EXPIRING_DAYS))
+        items = items.order_by(F("expiration_date").asc(nulls_last=True), "id")
+    add_breadcrumb(title=_("Risk acceptance"), top_level=True, request=request)
+    return render(request, "company/risk_inbox.html", {
+        "tab": tab,
+        "tabs": tabs,
+        "page": get_page_items(request, items, 25),
+        "expiring_days": EXPIRING_DAYS,
+    })
+
+
+@login_required
+@require_POST
+def risk_decide(request):
+    """
+    Approve or reject pending requests (request=<id>, several for a bulk approve; a rejection needs a note) as an
+    approver who may edit every finding of them, never on their own request. The requester cancels their own
+    pending request here too (action=cancel). Any request failing a check: 403 and nothing changes.
+    """
+    action = request.POST.get("action")
+    ids = {int(value) for value in request.POST.getlist("request") if value.isascii() and value.isdigit()}
+    if action not in {"approve", "reject", "cancel"} or not ids:
+        return HttpResponseBadRequest(_("Choose an action and at least one request."))
+    chosen = list(RiskAcceptanceRequest.objects.filter(id__in=ids).order_by("id"))
+    if len(chosen) != len(ids):
+        raise Http404
+    inbox = reverse("company_risk_inbox")
+    if action == "cancel":
+        if any(item.requested_by_id != request.user.pk for item in chosen):
+            raise PermissionDenied
+        done = sum(risk_requests.cancel(item, request.user) for item in chosen)
+        messages.success(request, ngettext("Cancelled %(count)d request.", "Cancelled %(count)d requests.", done) % {"count": done},
+                         extra_tags="alert-success")
+        return redirect(inbox + "?tab=mine")
+
+    if not risk_requests.is_approver(request.user):
+        raise PermissionDenied
+    for item in chosen:
+        if item.requested_by_id == request.user.pk:  # four eyes; the inbox never offers it
+            raise PermissionDenied
+        finding_ids = list(item.findings.values_list("id", flat=True))
+        editable = get_authorized_findings_for_queryset("edit", Finding.objects.filter(id__in=finding_ids), user=request.user)
+        if editable.count() != len(finding_ids):
+            raise PermissionDenied
+    note = request.POST.get("note", "").strip()
+    if action == "reject" and not note:
+        messages.warning(request, _("Give the reason for the rejection; the requester sees it."), extra_tags="alert-warning")
+        return redirect(inbox + "?tab=waiting")
+
+    decided = created = failed = 0
+    with pghistory.context(source="company_risk_decide"):
+        for item in chosen:
+            if action == "reject":
+                decided += risk_requests.reject(item, request.user, note)
+                continue
+            try:
+                acceptances = risk_requests.approve(item, request.user, note)
+            except Exception:
+                logger.exception("company risk request #%d could not be approved", item.pk)
+                failed += 1
+                continue
+            if acceptances is not None:
+                decided += 1
+                created += len(acceptances)
+    if action == "approve":
+        done = ngettext("Approved %(count)d request: %(created)d risk acceptances created.",
+                        "Approved %(count)d requests: %(created)d risk acceptances created.", decided)
+        messages.success(request, done % {"count": decided, "created": created}, extra_tags="alert-success")
+    else:
+        messages.success(request, ngettext("Rejected %(count)d request.", "Rejected %(count)d requests.", decided) % {"count": decided},
+                         extra_tags="alert-success")
+    if failed:
+        messages.error(request, ngettext("%(count)d request could not be approved and is still waiting.",
+                                         "%(count)d requests could not be approved and are still waiting.", failed) % {"count": failed},
+                       extra_tags="alert-danger")
+    if already := len(chosen) - decided - failed:
+        messages.info(request, ngettext("%(count)d request had been decided already.", "%(count)d requests had been decided already.",
+                                        already) % {"count": already}, extra_tags="alert-info")
+    return redirect(inbox + "?tab=waiting")

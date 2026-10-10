@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load i18n %}
+{# company: risk acceptance requests and acceptances (dojo.company.views.risk_inbox). Decisions post to company_risk_decide. #}
+{# Only classes from tailwind-out.css and company.css; rows open with native details elements, no script. #}
+{% block content %}
+    {{ block.super }}
+    {% url 'company_risk_decide' as decide_url %}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="no-margin-top">{% trans "Risk acceptance" %}</h3>
+        </div>
+        <div class="panel-body">
+            <ul class="nav nav-tabs company-risk-tabs">
+                {% for name in tabs %}
+                    <li{% if name == tab %} class="active"{% endif %}>
+                        <a href="?tab={{ name }}" data-testid="company-risk-tab-{{ name }}">
+                            {% if name == "waiting" %}{% trans "Waiting for my approval" %}{% elif name == "mine" %}{% trans "My requests" %}{% elif name == "active" %}{% trans "Active" %}{% else %}{% blocktrans with days=expiring_days %}Expiring in {{ days }} days{% endblocktrans %}{% endif %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if tab == "waiting" %}
+                {% if page %}
+                    <form id="company-risk-bulk" method="post" action="{{ decide_url }}" class="company-risk-bulk">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve">
+                        <button type="submit" class="btn btn-primary btn-sm" data-testid="company-risk-approve-selected">
+                            <i class="fa-solid fa-check-double"></i> {% trans "Approve selected" %}
+                        </button>
+                    </form>
+                    {% for item in page %}
+                        <div class="company-risk-item" data-testid="company-risk-waiting-{{ item.id }}">
+                            <input type="checkbox" name="request" value="{{ item.id }}" form="company-risk-bulk" aria-label="{% blocktrans with id=item.id %}Select request {{ id }}{% endblocktrans %}">
+                            <details>
+                                <summary>
+                                    {% blocktrans with id=item.id user=item.requested_by|default:_("a removed user") days=item.days count counter=item.findings.all|length %}#{{ id }}: {{ user }} asks for {{ days }} days, {{ counter }} finding{% plural %}#{{ id }}: {{ user }} asks for {{ days }} days, {{ counter }} findings{% endblocktrans %}
+                                    <span class="text-muted">{{ item.created|date }}</span>
+                                </summary>
+                                <p class="company-risk-justification">{{ item.justification|linebreaksbr }}</p>
+                                {% include "company/_risk_findings.html" with findings=item.findings.all %}
+                                <form method="post" action="{{ decide_url }}" class="company-risk-decide">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request" value="{{ item.id }}">
+                                    <label class="control-label" for="company-risk-note-{{ item.id }}">{% trans "Note (required to reject)" %}</label>
+                                    <textarea name="note" id="company-risk-note-{{ item.id }}" class="form-control" rows="2" maxlength="2000"></textarea>
+                                    <button type="submit" name="action" value="approve" class="btn btn-primary btn-sm" data-testid="company-risk-approve">
+                                        <i class="fa-solid fa-check"></i> {% trans "Approve" %}
+                                    </button>
+                                    <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm" data-testid="company-risk-reject">
+                                        <i class="fa-solid fa-xmark"></i> {% trans "Reject" %}
+                                    </button>
+                                </form>
+                            </details>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="company-risk-empty">{% trans "No request is waiting for you." %}</p>
+                {% endif %}
+
+            {% elif tab == "mine" %}
+                {% if page %}
+                    <table class="table table-condensed table-striped">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>{% trans "Findings" %}</th><th>{% trans "Days" %}</th><th>{% trans "Status" %}</th>
+                                <th>{% trans "Decided by" %}</th><th>{% trans "Note" %}</th><th>{% trans "Risk acceptances" %}</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in page %}
+                                <tr data-testid="company-risk-mine-{{ item.id }}">
+                                    <td>{{ item.id }}<br><span class="text-muted">{{ item.created|date }}</span></td>
+                                    <td>
+                                        <details>
+                                            <summary>{% blocktrans count counter=item.findings.all|length %}{{ counter }} finding{% plural %}{{ counter }} findings{% endblocktrans %}</summary>
+                                            {% include "company/_risk_findings.html" with findings=item.findings.all %}
+                                        </details>
+                                    </td>
+                                    <td>{{ item.days }}</td>
+                                    <td>{{ item.get_status_display }}</td>
+                                    <td>{% if item.decided_by %}{{ item.decided_by }}<br><span class="text-muted">{{ item.decided_at|date }}</span>{% endif %}</td>
+                                    <td>{{ item.decision_note|linebreaksbr }}</td>
+                                    <td>
+                                        {% for acceptance in item.risk_acceptances.all %}
+                                            {% if acceptance.engagement %}<a href="{% url 'view_risk_acceptance' acceptance.engagement.id acceptance.id %}">{{ acceptance }}</a><br>{% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if item.status == "pending" %}
+                                            <form method="post" action="{{ decide_url }}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="request" value="{{ item.id }}">
+                                                <button type="submit" name="action" value="cancel" class="btn btn-default btn-sm" data-testid="company-risk-cancel">{% trans "Cancel request" %}</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="company-risk-empty">{% trans "You have not requested risk acceptance yet. Use Request risk acceptance on a finding, or in the bulk menu of a findings list." %}</p>
+                {% endif %}
+
+            {% else %}
+                {% if page %}
+                    <table class="table table-condensed table-striped">
+                        <thead>
+                            <tr>
+                                <th>{% trans "Name" %}</th><th>{% trans "Product" %}</th><th>{% trans "Owner" %}</th>
+                                <th>{% trans "Accepted by" %}</th><th>{% trans "Findings" %}</th><th>{% trans "Expires" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for acceptance in page %}
+                                <tr data-testid="company-risk-acceptance-{{ acceptance.id }}">
+                                    <td>{% if acceptance.engagement %}<a href="{% url 'view_risk_acceptance' acceptance.engagement.id acceptance.id %}">{{ acceptance }}</a>{% else %}{{ acceptance }}{% endif %}</td>
+                                    <td>{{ acceptance.engagement.product|default:"" }}</td>
+                                    <td>{{ acceptance.owner }}</td>
+                                    <td>{{ acceptance.accepted_by|default:"" }}</td>
+                                    <td>{{ acceptance.finding_count }}</td>
+                                    <td>{% if acceptance.expiration_date %}{{ acceptance.expiration_date|date }}{% else %}{% trans "Never" %}{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="company-risk-empty">{% trans "No risk acceptance to show." %}</p>
+                {% endif %}
+            {% endif %}
+            {% include "dojo/paging_snippet.html" with page=page %}
+        </div>
+    </div>
+{% endblock %}

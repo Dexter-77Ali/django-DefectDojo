@@ -3,11 +3,12 @@ company: provision directory users before their first login, and catch leavers.
 
     manage.py company_ldap_sync
 
-Reads the members of the directory groups DefectDojo uses (the admin group, dojo-pt-<product type>
-and dojo-team-<team>, prefixes from the settings) with the django-auth-ldap connection settings, then
-for each member creates or updates the DefectDojo user (CompanyLDAPBackend.populate_user) and applies
-the same product-type and team sync as a login. Run it at rollout and nightly (cron), so people can be
-picked as assignees before they have logged in. Local accounts (with a usable password) are never
+Reads the members of the directory groups DefectDojo uses (the admin and risk approver groups,
+dojo-pt-<product type> and dojo-team-<team>, prefixes from the settings) with the django-auth-ldap
+connection settings, then for each member creates or updates the DefectDojo user
+(CompanyLDAPBackend.populate_user) and applies the same product-type, team and approver sync as a
+login. Run it at rollout and nightly (cron), so people can be picked as assignees before they have
+logged in. Local accounts (with a usable password) are never
 touched: the backend refuses them. Only direct group members are read, like the login sync.
 
 Directory users (Django group company:directory) the member read did not reach are then rechecked:
@@ -49,18 +50,18 @@ def _values(attrs, name):
     return [value.decode() if isinstance(value, bytes) else value for value in attrs.get(name, [])]
 
 
-def group_member_dns(connection, group_search, prefixes, admin_group_dn=None) -> set[str]:
-    """Member DNs of the groups whose cn starts with one of the prefixes, and of the admin group."""
+def group_member_dns(connection, group_search, prefixes, *group_dns) -> set[str]:
+    """Member DNs of the groups whose cn starts with one of the prefixes, and of the groups named by DN (admin, risk approvers)."""
     import ldap  # noqa: PLC0415 -- python-ldap is only in the company image
     from ldap.filter import escape_filter_chars  # noqa: PLC0415
 
     names = "".join(f"(cn={escape_filter_chars(prefix)}*)" for prefix in prefixes)
     results = connection.search_s(group_search.base_dn, group_search.scope, f"(&{group_search.filterstr}(|{names}))", ["member"])
-    if admin_group_dn:
+    for group_dn in filter(None, group_dns):
         try:
-            results += connection.search_s(admin_group_dn, ldap.SCOPE_BASE, "(objectClass=*)", ["member"])
+            results += connection.search_s(group_dn, ldap.SCOPE_BASE, "(objectClass=*)", ["member"])
         except ldap.NO_SUCH_OBJECT:
-            logger.warning("company ldap sync: admin group %s does not exist", admin_group_dn)
+            logger.warning("company ldap sync: group %s does not exist", group_dn)
     members = set()
     for dn, attrs in results:
         if dn is None:  # Active Directory search referral
@@ -115,7 +116,8 @@ class Command(BaseCommand):
         counts = {"created": 0, "updated": 0, "inactive": 0, "skipped": 0, "rechecked": 0, "deactivated": 0}
         connection = bind(backend)
         try:
-            dns = group_member_dns(connection, backend.settings.GROUP_SEARCH, prefixes, admin_group)
+            approver_group = getattr(settings, "COMPANY_LDAP_RISK_APPROVER_GROUP", "")
+            dns = group_member_dns(connection, backend.settings.GROUP_SEARCH, prefixes, admin_group, approver_group)
             usernames = usernames_for(connection, dns, getattr(settings, "COMPANY_LDAP_PROFILE", "ad"))
             seen = self.sync_members(backend, usernames, counts)
             if counts["created"] + counts["updated"]:
@@ -145,7 +147,7 @@ class Command(BaseCommand):
             if not user.is_active:  # a deactivated user stays as the administrator left it, like at login
                 counts["inactive"] += 1
                 continue
-            product_types, teams = self.sync(user, user.ldap_user.group_names)
+            product_types, teams = self.sync(user, user.ldap_user)
             counts["updated" if existed else "created"] += 1
             self.stdout.write(f"{'updated' if existed else 'created'}: {user.username} "
                               f"product types {sorted(product_types) or '-'}, teams {sorted(teams) or '-'}")
@@ -167,7 +169,7 @@ class Command(BaseCommand):
             directory_user = backend.populate_user(user.username)  # also resets the admin flags
             if directory_user is None:
                 continue
-            product_types, teams = self.sync(directory_user, directory_user.ldap_user.group_names)
+            product_types, teams = self.sync(directory_user, directory_user.ldap_user)
             counts["rechecked"] += 1
             self.stdout.write(f"rechecked: {user.username} "
                               f"product types {sorted(product_types) or '-'}, teams {sorted(teams) or '-'}")
