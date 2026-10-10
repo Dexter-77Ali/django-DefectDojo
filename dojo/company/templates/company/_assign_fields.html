@@ -1,0 +1,21 @@
+{% load i18n %}
+{# company: team and person selects of the assign page and the finding page. teams: {team: [members who may be given the findings]} #}
+{# (dojo/company/teams.py assignable_teams); the person is optional and must belong to the chosen team, which the view checks. #}
+<select name="team" id="company-assign-team" class="form-control" required aria-label="{% trans 'Team' %}">
+    <option value="">{% trans "Choose a team…" %}</option>
+    {% for name in teams %}
+        <option value="{{ name }}"{% if name == team %} selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+</select>
+<select name="person" id="company-assign-person" class="form-control" aria-label="{% trans 'Person (optional)' %}">
+    <option value="">{% trans "Whole team" %}</option>
+    {% for name, members in teams.items %}
+        {% if members %}
+            <optgroup label="{{ name }}">
+                {% for member in members %}
+                    <option value="{{ member.id }}"{% if name == team %}{% if member.id|stringformat:"s" == person_id or member.username|lower == person_username %} selected{% endif %}{% endif %}>{{ member }}</option>
+                {% endfor %}
+            </optgroup>
+        {% endif %}
+    {% endfor %}
+</select>

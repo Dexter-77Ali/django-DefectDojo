@@ -12,6 +12,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Q
 from django.template import engines
 from django.template.loader_tags import BlockNode
 from django.test import override_settings
@@ -20,13 +21,19 @@ from django.utils import timezone
 
 import dojo
 from dojo.authorization.url_permissions import URL_PERMISSIONS
+from dojo.filters import DojoFilter, FindingSLAFilter, FindingTagFilter
+from dojo.finding.helper import OPEN_FINDINGS_QUERY
+from dojo.finding.queries import get_authorized_findings_for_queryset
+from dojo.finding.ui.filters import FindingFilter
 from dojo.importers.auto_create_context import AutoCreateContextManager
 from dojo.importers.options import ImporterOptions
 from dojo.importers.services import ImportResult, auto_import_scan
 from dojo.jira import services as jira_services
-from dojo.models import Dojo_User, Engagement, JIRA_Project, Test, Test_Type
+from dojo.models import Dojo_User, Engagement, Finding, JIRA_Project, Notes, Test, Test_Type
+from dojo.notifications.helper import NotificationManager, create_notification
 from dojo.risk_acceptance import helper as ra_helper
-from dojo.utils import grade_debounce_cache_key
+from dojo.tags.utils import bulk_add_tags_to_instances, bulk_remove_tags_from_instances
+from dojo.utils import get_return_url, grade_debounce_cache_key, redirect_to_return_url_or_else
 from unittests.dojo_test_case import DojoTestCase, get_unit_tests_scans_path, versioned_fixtures
 
 # URL names the company layer links to, hides or builds on, with sample arguments.
@@ -66,6 +73,8 @@ URL_NAMES = {
     "open_findings": (),
     "finding_bulk_update_all": (),
     "finding_bulk_update_all_product": (1,),
+    "endpoints_status_bulk": (1,),  # the finding page's endpoint bulk form, which must not get "Assign…"
+    "product_open_findings": (1,),
     # Phase 4 risk acceptance: upstream pages the inbox links to and enforcement guards
     "view_engagement": (1,),
     "add_risk_acceptance": (1,),
@@ -80,8 +89,8 @@ URL_NAMES = {
 }
 
 # Blocks of upstream dojo/templates/base.html that company/base.html overrides now (header_logo,
-# sidebar-items, support-tab, dojo_css, footer) or later phases will (tab_bar: upload and assign
-# buttons; modals and extra_javascript: company.js; settings-dropdown-items: language switch).
+# sidebar-items, support-tab, dojo_css, footer, tab_bar: upload and assign actions, modals: the bulk
+# "Assign…" form, extra_javascript: company.js) or a later phase will (settings-dropdown-items: language switch).
 BASE_BLOCKS = {
     "header_logo", "sidebar-items", "support-tab", "dojo_css", "footer",
     "tab_bar", "modals", "extra_javascript", "settings-dropdown-items",
@@ -143,6 +152,46 @@ class TestUpstreamContract(DojoTestCase):
             with self.subTest(name=name):
                 function = getattr(ra_helper, name)
                 self.assertLessEqual(parameters, set(inspect.signature(function).parameters))
+
+    def test_assign_building_blocks(self):
+        # Phase 3 assign view: authorization filter, return_url helpers, tag utilities, notifications
+        self.assertLessEqual({"permission", "queryset", "user"}, set(inspect.signature(get_authorized_findings_for_queryset).parameters))
+        self.assertEqual(list(inspect.signature(redirect_to_return_url_or_else).parameters), ["request", "or_else"])
+        self.assertIn('request.POST.get("return_url"', inspect.getsource(get_return_url))
+        for function in (bulk_add_tags_to_instances, bulk_remove_tags_from_instances):
+            self.assertEqual(list(inspect.signature(function).parameters)[:2], ["tag_or_tags", "instances"])
+        self.assertLessEqual({"event", "title", "recipients", "url"}, set(inspect.signature(create_notification).parameters))
+        # assignments reach people on the system channels: upstream merges system settings for these events
+        self.assertIn("company_finding_assigned", settings.NOTIFICATIONS_SYSTEM_LEVEL_TRUMP)
+        self.assertIn("settings.NOTIFICATIONS_SYSTEM_LEVEL_TRUMP", inspect.getsource(NotificationManager._process_recipients))
+        # notes join findings through Finding.notes; tag values are lower case (assignee:<username lower-cased>)
+        self.assertEqual(Finding._meta.get_field("notes").related_model, Notes)
+        self.assertTrue(Finding.tags.tag_options.force_lowercase)
+
+    def test_open_findings_filters_for_my_work(self):
+        # Phase 3 "My findings", team lists and tiles: ?tags=<tag string> filters by exact tag name (a tagulous
+        # field, one parameter, comma-separated tags ORed); ?outside_of_sla=1 is "Outside of SLA: True"
+        tags = FindingTagFilter.base_filters["tags"]
+        self.assertEqual((tags.field_name, tags.extra["to_field_name"]), ("tags__name", "name"))
+        self.assertIn('self.form.fields[field] = model._meta.get_field("tags").formfield()', inspect.getsource(DojoFilter.__init__))
+        sla = FindingFilter.base_filters["outside_of_sla"]
+        self.assertIsInstance(sla, FindingSLAFilter)
+        self.assertEqual(sla.options[1][1].__name__, "sla_violated")
+        self.assertEqual(OPEN_FINDINGS_QUERY, Q(active=True))
+        # "My work" tiles override this dashboard block; the bulk menu hooks company.js relies on
+        self.assertIn("finding_stats_tiles", _block_names(Path(dojo.__file__).parent / "templates" / "dojo" / "dashboard.html"))
+        templates = Path(dojo.__file__).parent / "templates" / "dojo"
+        snippet = (templates / "findings_list_snippet.html").read_text(encoding="utf-8")
+        view_test = (templates / "view_test.html").read_text(encoding="utf-8")
+        view_finding = (templates / "view_finding.html").read_text(encoding="utf-8")
+        self.assertIn("{% url 'finding_bulk_update_all' %}", snippet)
+        self.assertIn("{% url 'finding_bulk_update_all_product' product_tab.product.id %}", snippet)
+        self.assertIn("{% url 'finding_bulk_update_all_product' product_tab.product.id %}", view_test)
+        self.assertIn("{% url 'endpoints_status_bulk' finding.id %}", view_finding)  # must stay a different URL
+        for html in (snippet, view_test):
+            self.assertIn('id="bulk_edit_menu"', html)
+            self.assertIn("$('input[type=checkbox].select_one:checked')", html)
+            self.assertIn('name="finding_to_update"', html)
 
     def test_risk_acceptance_url_permissions(self):
         # Phase 4 enforcement adds the approver permission to these entries when it is switched on

@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load company_tags %}
 {# company: shortcuts at the top of the sidebar, included from block sidebar-items in company base.html before upstream's items. #}
 {# Every link resolves its URL with "url ... as": that never raises, so a link whose view is missing (not built yet, or renamed upstream) #}
 {# is left out instead of breaking every page. Markup and classes copy upstream's top-level sidebar links (dojo/templates/base.html). #}
@@ -17,6 +18,21 @@
         <i class="fa-solid fa-upload w-5 text-center flex-shrink-0"></i>
         <span class="truncate">{% trans "Upload scan" %}</span>
     </a>
+{% endif %}
+{% url 'open_findings' as company_open_findings_url %}
+{% if company_open_findings_url and request.user.is_authenticated %}
+    {# assignments are finding tags (dojo/company/teams.py); the links filter the open findings list by them #}
+    {% company_work_links request.user as company_work %}
+    <a href="{{ company_work.mine }}" data-testid="company-nav-my-findings" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        <i class="fa-solid fa-user-check w-5 text-center flex-shrink-0"></i>
+        <span class="truncate">{% trans "My findings" %}</span>
+    </a>
+    {% if company_work.team %}
+        <a href="{{ company_work.team }}" data-testid="company-nav-team-findings" class="flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+            <i class="fa-solid fa-users w-5 text-center flex-shrink-0"></i>
+            <span class="truncate">{% trans "My team's findings" %}</span>
+        </a>
+    {% endif %}
 {% endif %}
 {% url 'report_builder' as company_reports_url %}
 {% if company_reports_url %}

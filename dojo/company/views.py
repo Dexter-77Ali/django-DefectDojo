@@ -9,19 +9,29 @@ import pghistory
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
-from django.views.decorators.http import require_http_methods
+from django.utils.translation import ngettext
+from django.views.decorators.http import require_http_methods, require_POST
 
 from dojo.authorization.authorization import user_has_permission_or_403
+from dojo.company import teams
 from dojo.company.forms import NO_COMPONENT, QuickUploadForm, upload_engagement
+from dojo.finding.queries import get_authorized_findings_for_queryset
 from dojo.importers.services import auto_import_scan
 from dojo.jira import services as jira_services
-from dojo.models import Product, Test
-from dojo.utils import Product_Tab, add_breadcrumb, get_system_setting
+from dojo.models import Finding, Product, Test
+from dojo.utils import (
+    Product_Tab,
+    add_breadcrumb,
+    get_return_url,
+    get_system_setting,
+    redirect_to_return_url_or_else,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,4 +160,61 @@ def quick_upload(request):
         "no_component": NO_COMPONENT,
         "component_pick": component if component in {*form.component_titles, NO_COMPONENT} else ("__new__" if component else ""),
         "has_products": test is not None or form.fields["product"].queryset.exists(),
+    })
+
+
+@login_required
+@require_POST
+def assign(request):
+    """
+    Assign findings (finding_to_update, at most teams.MAX_FINDINGS) to a team and optionally a person.
+
+    Posted without a team (the bulk "Assign…" button), it shows the choices; with a team (the assign page,
+    the finding page) it saves and returns to return_url. Every finding must be editable by the user,
+    otherwise 403 and nothing changes.
+    """
+    return_url = (get_return_url(request) or "").strip()
+    if return_url and not url_has_allowed_host_and_scheme(return_url, allowed_hosts=None):
+        # upstream's redirect() raises (a 500) on a foreign return_url; refuse before anything changes
+        return HttpResponseBadRequest(_("return_url must stay on this site"))
+    raw_ids = request.POST.getlist("finding_to_update")
+    if not raw_ids or len(raw_ids) > teams.MAX_FINDINGS:
+        messages.warning(request, _("Select between 1 and %(max)d findings to assign.") % {"max": teams.MAX_FINDINGS},
+                         extra_tags="alert-warning")
+        return redirect_to_return_url_or_else(request, reverse("open_findings"))
+    ids = {int(value) for value in raw_ids if value.isascii() and value.isdigit()}
+    findings = list(
+        get_authorized_findings_for_queryset("edit", Finding.objects.filter(id__in=ids), user=request.user)
+        .select_related("test__engagement__product").prefetch_related("tags").order_by("numerical_severity", "id"),
+    )
+    if len(findings) != len(set(raw_ids)):  # a finding the user may not edit, a missing one or a forged id
+        raise PermissionDenied
+
+    choices = teams.assignable_teams(findings)
+    team = request.POST.get("team", "")
+    person_id = request.POST.get("person", "")
+    error = None
+    if team:
+        members = choices.get(team)
+        person = next((user for user in members if str(user.id) == person_id), None) if members is not None else None
+        if members is None:
+            error = _("Choose one of the teams.")
+        elif person_id and person is None:
+            error = _("The chosen person is not an active member of this team who can open every selected finding.")
+        else:
+            teams.assign(findings, team, person, request.user)
+            teams.notify(len(findings), team, person, members, request.user)
+            target = f"{team} / {person}" if person else team
+            done = ngettext("Assigned %(count)d finding to %(target)s.", "Assigned %(count)d findings to %(target)s.", len(findings))
+            messages.success(request, done % {"count": len(findings), "target": target}, extra_tags="alert-success")
+            return redirect_to_return_url_or_else(request, reverse("open_findings"))
+
+    add_breadcrumb(title=_("Assign findings"), top_level=True, request=request)
+    return render(request, "company/assign.html", {
+        "findings": findings,
+        "teams": choices,
+        "team": team,
+        "person_id": person_id,
+        "error": error,
+        "return_url": return_url or reverse("open_findings"),
     })

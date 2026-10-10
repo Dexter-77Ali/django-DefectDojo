@@ -15,17 +15,24 @@ Off unless DD_COMPANY_LDAP_ENABLED=True. dojo/settings/local_settings.py then ca
     DD_COMPANY_LDAP_ADMIN_GROUP    group DN whose members become superuser + staff
     DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX   groups named <prefix><product type name>
                                    grant access to that product type (default dojo-pt-)
+    DD_COMPANY_LDAP_TEAM_GROUP_PREFIX   groups named <prefix><team> put the user in the
+                                   Django group team:<team> (default dojo-team-), which
+                                   findings are assigned to (dojo/company/teams.py)
 
 Role model of open-source 3.x: superuser, staff (read/write everywhere) and per
 product / product-type authorized users. The directory is authoritative for LDAP
-users: on every login their product-type memberships are set to exactly the
-groups they carry. The local ModelBackend stays last so the admin account and
-API token login keep working. Local accounts (usable password) are never matched
+users: on every login (and on every `manage.py company_ldap_sync`) their
+product-type memberships and teams are set to exactly the groups they carry.
+The sync also rechecks directory users outside every group (they lose that access)
+and deactivates those no longer in the directory (deleted, or disabled in AD).
+The local ModelBackend stays last so the admin account and API token login keep
+working. Local accounts (usable password) are never matched
 by a directory account of the same name (see ldap_backend.py), and a deactivated
 directory user's session ends on the next request.
 """
 
 import logging
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -38,6 +45,15 @@ logger = logging.getLogger(__name__)
 
 BACKEND = "dojo.company.ldap_backend.CompanyLDAPBackend"
 DEFAULT_PREFIX = "dojo-pt-"
+DEFAULT_TEAM_PREFIX = "dojo-team-"
+# Django group names of teams, and the finding tags that assign findings to them, start with this.
+TEAM = "team:"
+TEAM_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+# Django group every directory user is put in by ldap_backend.sync_directory_access, so
+# manage.py company_ldap_sync can tell them from local accounts without a password.
+DIRECTORY = "company:directory"
+# Active Directory accounts with the ACCOUNTDISABLE bit set are treated as gone.
+AD_ENABLED = "(!(userAccountControl:1.2.840.113556.1.4.803:=2))"
 
 
 def configure(target: dict, env) -> None:
@@ -47,7 +63,7 @@ def configure(target: dict, env) -> None:
 
     profile = env("DD_COMPANY_LDAP_PROFILE", default="ad")
     if profile == "ad":
-        user_filter, group_filter, group_type = "(sAMAccountName=%(user)s)", "(objectClass=group)", ActiveDirectoryGroupType()
+        user_filter, group_filter, group_type = f"(&(sAMAccountName=%(user)s){AD_ENABLED})", "(objectClass=group)", ActiveDirectoryGroupType()
     elif profile == "openldap":
         user_filter, group_filter, group_type = "(uid=%(user)s)", "(objectClass=groupOfNames)", GroupOfNamesType(name_attr="cn")
     else:
@@ -66,6 +82,8 @@ def configure(target: dict, env) -> None:
         "AUTH_LDAP_ALWAYS_UPDATE_USER": True,
         "AUTH_LDAP_MIRROR_GROUPS": False,
         "COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX": env("DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX", default=DEFAULT_PREFIX),
+        "COMPANY_LDAP_TEAM_GROUP_PREFIX": env("DD_COMPANY_LDAP_TEAM_GROUP_PREFIX", default=DEFAULT_TEAM_PREFIX),
+        "COMPANY_LDAP_PROFILE": profile,  # read by manage.py company_ldap_sync to map member DNs to usernames
     })
     admin_group = env("DD_COMPANY_LDAP_ADMIN_GROUP", default="")
     if admin_group:
@@ -108,3 +126,30 @@ def sync_product_type_access(user, group_names, prefix: str | None = None) -> se
             product_type.authorized_users.remove(user.pk)
     logger.info("company ldap: %s authorized for product types %s", user.username, sorted(granted) or "none")
     return granted
+
+
+def team_slug(name: str) -> str:
+    """Team name as used in "team:<name>": lower case, runs of other characters than a-z 0-9 . _ - become one dash."""
+    return re.sub(r"[^a-z0-9._-]+", "-", name.strip().lower()).strip("-")[:64]
+
+
+def team_names_from_groups(group_names, prefix: str | None = None) -> set[str]:
+    """Team names encoded in group names that carry the team prefix (dojo-team-Wallet Ops -> wallet-ops)."""
+    prefix = (prefix or getattr(settings, "COMPANY_LDAP_TEAM_GROUP_PREFIX", DEFAULT_TEAM_PREFIX)).lower()
+    names = {team_slug(name[len(prefix):]) for name in group_names if name.lower().startswith(prefix)}
+    return {name for name in names if TEAM_NAME.match(name)}
+
+
+def sync_team_membership(user, group_names, prefix: str | None = None) -> set[str]:
+    """Make the user's team:<name> Django groups equal to the directory's team groups; other groups stay. Returns the teams."""
+    from django.contrib.auth.models import Group  # noqa: PLC0415 -- see the module-level note
+
+    wanted = {TEAM + name for name in team_names_from_groups(group_names, prefix)}
+    current = set(user.groups.filter(name__startswith=TEAM).values_list("name", flat=True))
+    if stale := current - wanted:
+        user.groups.remove(*Group.objects.filter(name__in=stale))
+    if missing := wanted - current:
+        user.groups.add(*(Group.objects.get_or_create(name=name)[0] for name in sorted(missing)))
+    teams = {name[len(TEAM):] for name in wanted}
+    logger.info("company ldap: %s is in teams %s", user.username, sorted(teams) or "none")
+    return teams

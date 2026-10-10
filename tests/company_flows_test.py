@@ -52,6 +52,34 @@ class CompanyFlowsTest(BaseTestCase):
         self.assertTrue(self.is_success_message_present(text="0 new, 0 closed, 0 reactivated, 4 unchanged"))
         self.assertEqual(driver.current_url, test_url)
 
+    def listed_finding_ids(self):
+        return {box.get_attribute("id") for box in self.driver.find_elements(By.CSS_SELECTOR, "input[type=checkbox].select_one")}
+
+    @on_exception_html_source_logger
+    def test_bulk_assign(self):
+        # Phase 3: tick two findings, "Assign…", pick the team and admin, Save; "My findings" and "My team's findings"
+        # list them. Needs the team "qa" with admin in it: no page creates teams (they come from the directory or
+        # manage.py company_teams), so the test-company-ui job runs the command before this suite, and so must a local run.
+        driver = self.driver
+        driver.get(self.base_url + "finding/open")
+        boxes = driver.find_elements(By.CSS_SELECTOR, "input[type=checkbox].select_one")[:2]
+        self.assertEqual(len(boxes), 2, "the quick upload test leaves four open findings")
+        chosen = {box.get_attribute("id") for box in boxes}
+        for box in boxes:
+            box.click()
+        assign = driver.find_element(By.CSS_SELECTOR, '#bulk_edit_menu button[data-testid="company-bulk-assign"]')
+        WebDriverWait(driver, 10).until(lambda _driver: assign.is_displayed())
+        assign.click()
+        Select(driver.find_element(By.ID, "company-assign-team")).select_by_value("qa")
+        driver.find_element(By.XPATH, "//select[@id='company-assign-person']/optgroup[@label='qa']/option[contains(., '(admin)')]").click()
+        driver.find_element(By.CSS_SELECTOR, 'button[data-testid="company-assign-save"]').click()
+        self.assertTrue(self.is_success_message_present(text="Assigned 2 findings to qa / "))
+
+        driver.find_element(By.CSS_SELECTOR, '#dd-sidebar a[data-testid="company-nav-my-findings"]').click()
+        self.assertEqual(self.listed_finding_ids(), chosen)
+        driver.find_element(By.CSS_SELECTOR, '#dd-sidebar a[data-testid="company-nav-team-findings"]').click()
+        self.assertEqual(self.listed_finding_ids(), chosen)
+
 
 def suite():
     suite = unittest.TestSuite()
@@ -59,6 +87,7 @@ def suite():
     suite.addTest(CompanyFlowsTest("test_my_work_shortcut"))
     suite.addTest(ProductTest("test_create_product"))
     suite.addTest(CompanyFlowsTest("test_quick_upload"))
+    suite.addTest(CompanyFlowsTest("test_bulk_assign"))
     suite.addTest(ProductTest("test_delete_product"))
     return suite
 

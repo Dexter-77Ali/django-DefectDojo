@@ -57,3 +57,29 @@
   gap: 0.5rem;
   margin: 0.5rem 0;
 }
+/* dojo.css colours every link with the palette colour outside any cascade layer, which beats Tailwind's
+   layered .btn-success text colour: on a green palette the label disappeared into the green button. */
+.company-quick-actions a.btn-success,
+.company-quick-actions a.btn-success:hover,
+.company-quick-actions a.btn-success:focus {
+  color: #fff;
+}
+
+/* Assign on the finding page (company/_quick_actions.html) and in the findings bulk menu (company.js). */
+.company-assign {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.company-assign select.form-control {
+  width: auto;
+  max-width: 16rem;
+}
+.company-bulk-assign {
+  display: inline-block;
+  margin-left: 0.25rem;
+}
+
+/* "My work" tiles above the upstream dashboard tiles (dojo/dashboard.html). */
+.company-my-work {
+  margin-bottom: 0.5rem;
+}

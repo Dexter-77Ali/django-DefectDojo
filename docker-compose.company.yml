@@ -47,6 +47,8 @@ x-company-env: &company-env
   DD_COMPANY_LDAP_GROUP_BASE: "${DD_COMPANY_LDAP_GROUP_BASE:-ou=groups,dc=company,dc=test}"
   DD_COMPANY_LDAP_ADMIN_GROUP: "${DD_COMPANY_LDAP_ADMIN_GROUP:-cn=dojo-admins,ou=groups,dc=company,dc=test}"
   DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX: "${DD_COMPANY_LDAP_PRODUCT_TYPE_GROUP_PREFIX:-dojo-pt-}"
+  # groups named <prefix><team> put their members in the team (findings are assigned to teams)
+  DD_COMPANY_LDAP_TEAM_GROUP_PREFIX: "${DD_COMPANY_LDAP_TEAM_GROUP_PREFIX:-dojo-team-}"
 
 services:
   uwsgi:
@@ -63,7 +65,7 @@ services:
     environment: *company-env
 
   # Local test directory, only with `--profile ldap`. Seeded from docker/company/ldap/*.ldif
-  # (users alice/bob/carol, groups dojo-admins and dojo-pt-<product type>). Not for production.
+  # (users alice/bob/carol/dave, groups dojo-admins, dojo-pt-<product type> and dojo-team-<team>). Not for production.
   ldap:
     image: osixia/openldap:1.5.0
     profiles:

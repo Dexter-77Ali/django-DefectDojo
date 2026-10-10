@@ -63,6 +63,8 @@ if COMPANY_LDAP_ENABLED:
 
 # --- notifications (see dojo/company/notifications.py) ----------------------------
 NOTIFICATION_MANAGER = "dojo.company.notifications.CompanyNotificationManager"
+# Assignments (dojo/company/teams.py) reach the assignee on the system channels too, like upstream's review requests.
+NOTIFICATIONS_SYSTEM_LEVEL_TRUMP += ["company_finding_assigned"]  # noqa: F821 -- set by dojo.notifications.settings
 COMPANY_ESCALATION_EMAILS = env.list("DD_COMPANY_ESCALATION_EMAILS", default=[])  # noqa: F821
 COMPANY_ESCALATION_EVENTS = env.list(  # noqa: F821
     "DD_COMPANY_ESCALATION_EVENTS",

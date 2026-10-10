@@ -1,5 +1,6 @@
 # company: seed for the local OpenLDAP test directory (docker-compose.company.yml, profile ldap).
-# Test accounts only. Passwords: alice123, bob123, carol123.
+# Test accounts only. Passwords: alice123, bob123, carol123, dave123. dave never logs in in the manual
+# checks: manage.py company_ldap_sync provisions him (product type and team) before his first login.
 
 dn: ou=users,dc=company,dc=test
 objectClass: organizationalUnit
@@ -36,6 +37,15 @@ sn: Contractor
 mail: carol@company.test
 userPassword: carol123
 
+dn: uid=dave,ou=users,dc=company,dc=test
+objectClass: inetOrgPerson
+uid: dave
+cn: Dave Developer
+givenName: Dave
+sn: Developer
+mail: dave@company.test
+userPassword: dave123
+
 dn: cn=dojo-admins,ou=groups,dc=company,dc=test
 objectClass: groupOfNames
 cn: dojo-admins
@@ -45,3 +55,10 @@ dn: cn=dojo-pt-Research and Development,ou=groups,dc=company,dc=test
 objectClass: groupOfNames
 cn: dojo-pt-Research and Development
 member: uid=bob,ou=users,dc=company,dc=test
+member: uid=dave,ou=users,dc=company,dc=test
+
+dn: cn=dojo-team-wallet,ou=groups,dc=company,dc=test
+objectClass: groupOfNames
+cn: dojo-team-wallet
+member: uid=bob,ou=users,dc=company,dc=test
+member: uid=dave,ou=users,dc=company,dc=test

@@ -114,6 +114,12 @@ jobs:
         timeout-minutes: 10
         run: docker compose up --no-deps --exit-code-from initializer initializer
 
+      - name: Team for the assign test
+        # tests/company_flows_test.py assigns to team "qa"; teams come from the directory or this command, no page creates them
+        run: |-
+             docker compose exec -T uwsgi python manage.py company_teams create qa
+             docker compose exec -T uwsgi python manage.py company_teams add qa admin
+
       - name: Company UI tests
         timeout-minutes: 15
         run: docker compose up --no-deps --exit-code-from integration-tests integration-tests

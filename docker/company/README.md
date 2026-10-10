@@ -73,7 +73,7 @@ variable no compose file passes on.
 | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` | escalation copies | none / SLA and risk-acceptance events |
 | `DD_TIME_ZONE` | local time for UI dates and the daily SLA job (07:30), e.g. `Asia/Baghdad` | `UTC` |
 | `secrets/dd_email_url` | outgoing mail relay for notifications and escalation copies (production layer) | `smtp://localhost:25`, sends nothing |
-| `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, group prefix) | off |
+| `DD_COMPANY_LDAP_*` | directory login (`DD_COMPANY_LDAP_ENABLED=True`, profile `ad` or `openldap`, URI, bases, admin group, product-type and team group prefixes) | off |
 | `DD_COMPANY_UPLOAD_ENGAGEMENT_NAME` | engagement that UI uploads and CI re-imports share, so a fixed finding closes whichever way the next scan arrives | `Security scans` |
 | `DD_COMPANY_SCAN_TYPES` | scanner allowlist, comma separated scan types, applied by `manage.py company_scan_types` (see *Scanner allowlist*) | empty: every scanner |
 | `DD_FOOTER_VERSION` | version text in the footer | the image tag |
@@ -157,11 +157,67 @@ X.509") into `secrets/dd_company_ldap_ca_cert`; the production layer points
 `DD_COMPANY_LDAP_CA_CERT_PATH` at it. Left empty, the system CA store is used. Create one AD
 group per product type named `dojo-pt-<product type name>` (prefix configurable). Members of the admin group become
 superusers; members of a product-type group see that product type; everyone else can log in
-and sees nothing until a group is assigned. Local accounts (the bootstrap `admin`, break-glass
+and sees nothing until a group is assigned. Create one group per team named `dojo-team-<team>`
+(`DD_COMPANY_LDAP_TEAM_GROUP_PREFIX`, default `dojo-team-`); its members form the team findings
+are assigned to (see *Teams and assignments*). The directory is authoritative: on every login a
+directory user's product types and teams are set to exactly the groups they carry. Local accounts (the bootstrap `admin`, break-glass
 and service accounts, i.e. anything with a local password) keep working through the local
 backend and are never matched by a directory account of the same name; a directory user
 named `admin` is rejected by the directory backend. Deactivating a user in DefectDojo ends
 their session on the next request.
+
+### Directory users before their first login
+
+Directory users get a DefectDojo account on their first login, so until then nobody can pick them as
+an assignee. `manage.py company_ldap_sync` reads the members of the admin, `dojo-pt-*` and
+`dojo-team-*` groups, creates or updates their accounts and applies the same product-type and team
+sync as a login (local accounts are never touched). Run it once at rollout and then nightly:
+
+```bash
+docker compose $F exec -T uwsgi python manage.py company_ldap_sync
+# host crontab, nightly at 02:15:
+15 2 * * * cd /opt/defectdojo && docker compose $F exec -T uwsgi python manage.py company_ldap_sync >> /var/log/defectdojo-ldap-sync.log 2>&1
+```
+
+It prints one line per member and a summary (`N directory group members: … created, … updated, …
+inactive, … skipped; … rechecked, … deactivated`). Only direct members are read, as at login.
+Directory users it did not reach are then rechecked: someone removed from every group loses their
+product types, teams and admin rights; someone deleted from the directory, or disabled in Active
+Directory, is deactivated (sessions and API token stop working; reactivate them by hand if they come
+back). Directory users are recognised by the Django group `company:directory`, which every login and
+sync sets, so people who already left before the first sync of this version are not caught:
+deactivate those by hand. When no member can be synced at all (for example a wrong
+`DD_COMPANY_LDAP_USER_BASE`), the recheck is skipped instead of deactivating everyone. Active Directory
+returns at most 1500 members of a group per read; members past that are provisioned at their first login.
+
+## Teams and assignments
+
+Findings are assigned to a team and optionally a person: *Assign…* in the bulk menu of a findings
+list or test page (tick findings first), or the *Assign* form under the tabs of a finding page.
+The person list shows active team members who can open every selected finding. Each assignment
+replaces the previous one, adds a note "Assigned to <team> / <person> by <user>" to every finding
+and notifies the person, or every team member when no person is chosen (event
+`company_finding_assigned`, delivered on the channels of the *Other* row; it also follows the
+system notification settings). The assignment is stored as finding tags `team:<team>` and
+`assignee:<username>`, so it survives close, reopen and re-import and filters on every findings list
+and in the API (`?tags=team:wallet`). *My findings* and *My team's findings* in the sidebar and the
+tiles on the dashboard (*My work*) open those lists.
+
+Teams are Django groups named `team:<team>`. With LDAP they come from the `dojo-team-<team>`
+groups. Without a directory, or for local accounts, a superuser manages them:
+
+```bash
+docker compose $F exec uwsgi python manage.py company_teams list
+docker compose $F exec uwsgi python manage.py company_teams create wallet
+docker compose $F exec uwsgi python manage.py company_teams add wallet alice
+docker compose $F exec uwsgi python manage.py company_teams remove wallet alice
+docker compose $F exec uwsgi python manage.py company_teams delete wallet   # findings keep their team:wallet tag
+```
+
+Team names are lower case: letters, digits, `.`, `_` and `-`. A directory user's teams are reset to
+their directory groups on every login, so add directory users to the directory group instead. With
+the system setting *Filter string matching* on, a *My team's findings* link for someone in several
+teams matches nothing (that filter takes a single tag); keep the setting off.
 
 ## Backup and restore
 

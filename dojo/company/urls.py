@@ -17,6 +17,7 @@ __all__ = ["company_patterns", "handler400", "handler403", "handler500", "urlpat
 # Company views append here (URL names start with "company_"); served under <url_prefix>company/.
 company_patterns = [
     re_path(r"^upload$", views.quick_upload, name="company_quick_upload"),
+    re_path(r"^assign$", views.assign, name="company_assign"),
 ]
 
 urlpatterns = [
