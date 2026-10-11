@@ -96,5 +96,5 @@ class TestCompanyLayout(DojoTestCase):
         self.client.logout()
         response = self.client.get(reverse("login"))
         self.assertEqual(response.status_code, 200)
-        # the login card is upstream's until real artwork replaces dojo/img/logo.png
-        self.assertContains(response, "dojo/img/logo.png")
+        # the login card is upstream's; a profile's login-logo.png replaces dojo/img/logo.svg (docker/company/apply-profile.sh)
+        self.assertContains(response, "dojo/img/logo.svg")

@@ -49,8 +49,10 @@ LDAPS CA support. Use `3.3.300-company.1` or later.
 ## Company profiles
 
 A profile is a folder `companies/<name>/` with `<name>.env` (non-secret `DD_COMPANY_*`
-values) and `assets/` (`icon.png`, `logo.png` for the company layout; optional `favicon.png`,
-`login-logo.png`, `chop.png` replacing the upstream images). Apply one with
+values) and `assets/` (`icon.png`, `logo.png` for the company layout; optional `favicon.png`
+and `login-logo.png`, which replace upstream's browser icon and login logo: the script copies
+each PNG and also writes the `favicon.svg` / `logo.svg` that upstream pages show since 3.4.0;
+an optional `chop.png` is still copied but no page shows it since 3.4.0). Apply one with
 
 ```bash
 bash docker/company/apply-profile.sh zaincash
@@ -68,7 +70,7 @@ variable no compose file passes on.
 | Variable | Effect | Default |
 |----------|--------|---------|
 | `DD_COMPANY_NAME` | sidebar, footer, report header, escalation subjects | `Company` |
-| `DD_COMPANY_PALETTE` | JSON `{"50": "#…", …, "900": "#…"}`, recolours the UI at runtime | teal placeholder in `company.css` |
+| `DD_COMPANY_PALETTE` | JSON `{"50": "#…", …, "900": "#…"}`, recolours buttons, the active sidebar item and the login button at runtime (since 3.4.0 not the sidebar background or links, which keep upstream's colours) | teal placeholder in `company.css` |
 | `DD_COMPANY_FIELDS` | JSON field definitions (label, choices) for product metadata | owner-team, business-unit |
 | `DD_COMPANY_SLA_FACTORS` | JSON product *Business criticality* (upstream product field: very high, high, medium, low, very low, none) → SLA day multiplier | 0.5 / 0.75 / 1.0 / 1.5 / 2.0 |
 | `DD_COMPANY_ESCALATION_EMAILS`, `DD_COMPANY_ESCALATION_EVENTS` | escalation copies | none / SLA and risk-acceptance events |
@@ -209,7 +211,7 @@ and notifies the person, or every team member when no person is chosen (event
 `company_finding_assigned`, delivered on the channels of the *Other* row; it also follows the
 system notification settings). The assignment is stored as finding tags `team:<team>` and
 `assignee:<username>`, so it survives close, reopen and re-import and filters on every findings list
-and in the API (`?tags=team:wallet`). *My findings* and *My team's findings* in the sidebar and the
+and in the API (`?tags=team:wallet`). *My findings* and *Team findings* in the sidebar and the
 tiles on the dashboard (*My work*) open those lists.
 
 Teams are Django groups named `team:<team>`. With LDAP they come from the `dojo-team-<team>`
@@ -225,7 +227,7 @@ docker compose $F exec uwsgi python manage.py company_teams delete wallet   # fi
 
 Team names are lower case: letters, digits, `.`, `_` and `-`. A directory user's teams are reset to
 their directory groups on every login, so add directory users to the directory group instead. With
-the system setting *Filter string matching* on, a *My team's findings* link for someone in several
+the system setting *Filter string matching* on, a *Team findings* link for someone in several
 teams matches nothing (that filter takes a single tag); keep the setting off.
 
 ## Mark fixed

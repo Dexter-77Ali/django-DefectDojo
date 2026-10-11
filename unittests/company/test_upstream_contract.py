@@ -7,6 +7,7 @@ this file) before releasing. Phases refer to the easier-UI plan (upload, assign,
 """
 
 import inspect
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -151,6 +152,30 @@ class TestUpstreamContract(DojoTestCase):
         self.assertIn("obj", inspect.signature(jira_services.get_project).parameters)
         self.assertIn("push_all_issues", {field.name for field in JIRA_Project._meta.get_fields()})
         self.assertIn('"push_to_jira"', inspect.getsource(ImporterOptions.validate_push_to_jira))
+
+    def test_profile_artwork_paths(self):
+        # docker/company/apply-profile.sh writes a profile's artwork over these upstream files (SVG since 3.4.0)
+        templates = Path(dojo.__file__).parent / "templates"
+        base = (templates / "base.html").read_text(encoding="utf-8")
+        self.assertIn('{% static "dojo/img/favicon.svg" %}', base)
+        self.assertIn('{% static "dojo/img/favicon.png" %}', base)
+        self.assertIn('{% static "dojo/img/logo.svg" %}', (templates / "dojo" / "login.html").read_text(encoding="utf-8"))
+        self.assertIn('{% static "dojo/img/logo.png" %}', (templates / "dojo" / "report_cover_page.html").read_text(encoding="utf-8"))
+
+    def test_company_template_utilities_are_compiled(self):
+        # Tailwind ships only the utilities upstream templates use, so one disappears when upstream stops using it
+        # (3.4.0 dropped w-8, h-8, text-lg and font-semibold, which sized the company sidebar logo). Company classes
+        # (company-*, styled in company.css or used as hooks) and Font Awesome icons (fa-*) are not Tailwind's.
+        static = Path(dojo.__file__).parent / "static" / "dojo"
+        css = "".join(path.read_text(encoding="utf-8") for path in sorted((static / "css").glob("*.css")))
+        for template in sorted((Path(dojo.__file__).parent / "company" / "templates").rglob("*.html")):
+            for attribute in re.findall(r'class="([^"{}]*)"', template.read_text(encoding="utf-8")):
+                for name in attribute.split():
+                    if name.startswith(("company-", "fa-")):
+                        continue
+                    selector = "." + re.sub(r"([^\w-])", r"\\\1", name)  # CSS escapes : / . [ ] ( ) in class names
+                    with self.subTest(template=template.name, name=name):
+                        self.assertRegex(css, re.escape(selector) + r"(?![\w-])")
 
     def test_tab_bar_markers(self):
         # Phase 2 test_quick_upload checks the company tab bar links between these upstream comments

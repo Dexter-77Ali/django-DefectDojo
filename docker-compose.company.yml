@@ -16,7 +16,9 @@ x-company-django: &company-django
     context: .
     dockerfile: Dockerfile.company
     args:
-      BASE_IMAGE: "defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
+      # the exact name docker-compose.yml gives the upstream build (registry prefix since 3.4.0), so this layer never
+      # builds on a stale local tag or a pulled image
+      BASE_IMAGE: "${DD_IMAGE_REGISTRY:-registry.defectdojo.com}/defectdojo/defectdojo-django:${DJANGO_VERSION:-latest}"
 
 x-company-env: &company-env
   DD_COMPANY_NAME: "${DD_COMPANY_NAME:-Company}"

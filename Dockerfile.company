@@ -8,7 +8,7 @@
 #
 # docker-compose.company.yml passes the upstream tag as BASE_IMAGE and names the result
 # defectdojo/defectdojo-django:<version>-company.
-ARG BASE_IMAGE=defectdojo/defectdojo-django:latest
+ARG BASE_IMAGE=registry.defectdojo.com/defectdojo/defectdojo-django:latest
 FROM ${BASE_IMAGE}
 ARG uid=1001
 

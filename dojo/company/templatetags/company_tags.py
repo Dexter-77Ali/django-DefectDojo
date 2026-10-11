@@ -8,7 +8,7 @@ register = template.Library()
 
 @register.simple_tag
 def company_work_links(user):
-    """Sidebar "My findings" and "My team's findings" URLs; the team URL is None without a team. One query."""
+    """Sidebar "My findings" and "Team findings" URLs; the team URL is None without a team. One query."""
     return teams.work_links(user)
 
 

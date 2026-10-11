@@ -158,7 +158,7 @@ def notify(count: int, team: str, person, members, by) -> None:
 
 
 def work_links(user) -> dict:
-    """Sidebar "My findings" and "My team's findings" URLs; the team URL is None without a team. One query."""
+    """Sidebar "My findings" and "Team findings" URLs; the team URL is None without a team. One query."""
     team_tags = [TEAM + name for name in user_team_names(user)]
     return {"mine": findings_url(assignee_tag(user)), "team": findings_url(*team_tags) if team_tags else None}
 

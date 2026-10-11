@@ -3,9 +3,12 @@
  *
  * Tailwind v4 emits utilities as var(--color-dd-primary-N) and defines the
  * tokens inside @layer theme; unlayered rules here win the cascade, so
- * redefining the tokens recolours the sidebar, buttons and links without a
- * Tailwind rebuild. Values below are PLACEHOLDERS (a teal ramp) until the
- * company palette is supplied; keep the 50..900 ramp shape.
+ * redefining the tokens recolours without a Tailwind rebuild. Since 3.4.0
+ * dd-primary is upstream's action colour (primary buttons, the active sidebar
+ * item, primary panel headings, the login button); the sidebar ground
+ * (--color-frame) and links (dd-interactive) have their own tokens. Values
+ * below are PLACEHOLDERS (a teal ramp) until the company palette is supplied;
+ * keep the 50..900 ramp shape and a 700 that carries --color-dd-on-primary text.
  */
 :root {
   --color-dd-primary-50:  #e6f4f3;
@@ -18,6 +21,18 @@
   --color-dd-primary-700: #165753;
   --color-dd-primary-800: #10413e;
   --color-dd-primary-900: #0a2b29;
+}
+
+/* Sidebar logo (company base.html, block header_logo). */
+.company-logo-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+.company-logo-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 /* Quick upload (company/quick_upload.html). A file input accepts a dropped file natively, so the drop zone is only styling. */

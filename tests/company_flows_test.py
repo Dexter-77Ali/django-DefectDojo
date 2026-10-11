@@ -57,7 +57,7 @@ class CompanyFlowsTest(BaseTestCase):
 
     @on_exception_html_source_logger
     def test_bulk_assign(self):
-        # Phase 3: tick two findings, "Assign…", pick the team and admin, Save; "My findings" and "My team's findings"
+        # Phase 3: tick two findings, "Assign…", pick the team and admin, Save; "My findings" and "Team findings"
         # list them. Needs the team "qa" with admin in it: no page creates teams (they come from the directory or
         # manage.py company_teams), so the test-company-ui job runs the command before this suite, and so must a local run.
         driver = self.driver

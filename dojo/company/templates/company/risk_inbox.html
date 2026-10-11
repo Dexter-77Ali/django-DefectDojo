@@ -164,7 +164,7 @@
                     <p class="company-risk-empty">{% trans "No risk acceptance to show." %}</p>
                 {% endif %}
             {% endif %}
-            {% include "dojo/paging_snippet.html" with page=page %}
+            <div class="clearfix">{% include "dojo/paging_snippet.html" with page=page %}</div>
         </div>
     </div>
 {% endblock %}

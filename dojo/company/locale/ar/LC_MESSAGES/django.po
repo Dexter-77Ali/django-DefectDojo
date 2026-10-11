@@ -334,8 +334,8 @@ msgid "My findings"
 msgstr "نتائجي"
 
 #: templates/company/_sidebar.html
-msgid "My team's findings"
-msgstr "نتائج فريقي"
+msgid "Team findings"
+msgstr "نتائج الفريق"
 
 #: templates/company/_sidebar.html templates/company/risk_inbox.html views.py
 msgid "Risk acceptance"
